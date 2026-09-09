@@ -6,7 +6,7 @@ const STORAGE_KEY = 'kesah:graph';
 
 function byId<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id);
-  if (!el) throw new Error(`No existe el elemento #${id}`);
+  if (!el) throw new Error(`Missing element #${id}`);
   return el as T;
 }
 
@@ -21,12 +21,12 @@ function loadSaved(graph: Graph): boolean {
     graph.load(Graph.parse(JSON.parse(raw)));
     return graph.nodeCount > 0;
   } catch (error) {
-    console.warn('No se pudo recuperar el grafo guardado', error);
+    console.warn('Could not restore the saved graph', error);
     return false;
   }
 }
 
-/** Grafo de ejemplo para que el lienzo no aparezca vacío la primera vez. */
+/** Sample graph so the canvas is not empty on the first visit. */
 function seedExample(graph: Graph): void {
   const a = graph.addNode(120, 160, 'A');
   const b = graph.addNode(320, 80, 'B');
@@ -60,13 +60,13 @@ function scheduleSave(): void {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(graph.toJSON()));
     } catch (error) {
-      console.warn('No se pudo guardar el grafo', error);
+      console.warn('Could not save the graph', error);
     }
   }, 300);
 }
 
 function refresh(): void {
-  status.textContent = `${count(graph.nodeCount, 'nodo', 'nodos')} · ${count(graph.edgeCount, 'arista', 'aristas')}`;
+  status.textContent = `${count(graph.nodeCount, 'node', 'nodes')} · ${count(graph.edgeCount, 'edge', 'edges')}`;
   chkDirected.checked = graph.directed;
 }
 
@@ -80,7 +80,7 @@ editor.onSelectionChange((selection) => {
 });
 
 btnNew.addEventListener('click', () => {
-  if (graph.nodeCount > 0 && !window.confirm('¿Borrar el grafo actual y empezar de cero?')) return;
+  if (graph.nodeCount > 0 && !window.confirm('Discard the current graph and start over?')) return;
   graph.clear();
   editor.fitView();
 });
@@ -99,21 +99,21 @@ btnExport.addEventListener('click', () => {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = 'grafo.json';
+  link.download = 'graph.json';
   link.click();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
 
 fileImport.addEventListener('change', async () => {
   const file = fileImport.files?.[0];
-  fileImport.value = ''; // permite volver a importar el mismo archivo
+  fileImport.value = ''; // allows importing the same file again
   if (!file) return;
   try {
     graph.load(Graph.parse(JSON.parse(await file.text())));
     editor.select(null);
     editor.fitView();
   } catch (error) {
-    window.alert(`No se pudo importar el archivo: ${error instanceof Error ? error.message : String(error)}`);
+    window.alert(`Could not import the file: ${error instanceof Error ? error.message : String(error)}`);
   }
 });
 

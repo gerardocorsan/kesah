@@ -15,7 +15,7 @@ export interface GraphEdge {
   label: string;
 }
 
-/** Formato de intercambio: lo que se exporta e importa como JSON. */
+/** Interchange format: what gets exported to and imported from JSON. */
 export interface GraphData {
   directed: boolean;
   nodes: GraphNode[];
@@ -32,7 +32,7 @@ function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
-/** Mayor sufijo numérico entre los ids con el prefijo dado (n1, n2, …), para seguir numerando sin repetir. */
+/** Highest numeric suffix among ids with the given prefix (n1, n2, …), so numbering can continue without repeats. */
 function maxSequence(ids: Iterable<string>, prefix: string): number {
   let max = 0;
   for (const id of ids) {
@@ -44,8 +44,8 @@ function maxSequence(ids: Iterable<string>, prefix: string): number {
 }
 
 /**
- * Modelo del grafo. No sabe nada del DOM: guarda nodos y aristas y avisa
- * a quien esté suscrito cada vez que algo cambia.
+ * Graph model. Knows nothing about the DOM: it stores nodes and edges and
+ * notifies subscribers whenever something changes.
  */
 export class Graph {
   private directedFlag = true;
@@ -83,7 +83,7 @@ export class Graph {
     return this.edges.get(id);
   }
 
-  /** Suscribe un oyente a cualquier cambio. Devuelve la función para desuscribirse. */
+  /** Subscribes a listener to every change. Returns the unsubscribe function. */
   onChange(listener: Listener): () => void {
     this.listeners.add(listener);
     return () => {
@@ -123,7 +123,7 @@ export class Graph {
     this.emit();
   }
 
-  /** Borra el nodo y todas las aristas que lo tocan. */
+  /** Removes the node together with every edge that touches it. */
   removeNode(id: NodeId): void {
     if (!this.nodes.delete(id)) return;
     for (const [edgeId, edge] of this.edges) {
@@ -132,7 +132,7 @@ export class Graph {
     this.emit();
   }
 
-  /** Arista que une source con target, si existe. En grafos no dirigidos vale en cualquier sentido. */
+  /** Edge joining source and target, if any. In undirected graphs either direction counts. */
   findEdge(source: NodeId, target: NodeId): GraphEdge | undefined {
     for (const edge of this.edges.values()) {
       if (edge.source === source && edge.target === target) return edge;
@@ -141,7 +141,7 @@ export class Graph {
     return undefined;
   }
 
-  /** Crea una arista. Devuelve null si sería un bucle, si falta algún nodo o si ya existía. */
+  /** Creates an edge. Returns null for self-loops, missing nodes or an edge that already exists. */
   addEdge(source: NodeId, target: NodeId, label = ''): GraphEdge | null {
     if (source === target || !this.nodes.has(source) || !this.nodes.has(target)) return null;
     if (this.findEdge(source, target)) return null;
@@ -183,7 +183,7 @@ export class Graph {
     };
   }
 
-  /** Sustituye todo el contenido por `data` (ya validado con `Graph.parse`). */
+  /** Replaces the whole content with `data` (already validated with `Graph.parse`). */
   load(data: GraphData): void {
     this.nodes.clear();
     this.edges.clear();
@@ -196,13 +196,13 @@ export class Graph {
   }
 
   /**
-   * Valida un valor desconocido (por ejemplo JSON importado) y lo convierte en
-   * GraphData saneado: descarta nodos mal formados o repetidos y aristas
-   * que apunten a nodos inexistentes. Lanza un error si ni siquiera tiene la forma básica.
+   * Validates an unknown value (for example imported JSON) and turns it into
+   * sanitized GraphData: malformed or duplicated nodes are dropped, as are
+   * edges pointing at missing nodes. Throws if the basic shape is wrong.
    */
   static parse(value: unknown): GraphData {
     if (!isRecord(value) || !Array.isArray(value.nodes) || !Array.isArray(value.edges)) {
-      throw new Error('El JSON debe ser un objeto con las listas "nodes" y "edges".');
+      throw new Error('The JSON must be an object with "nodes" and "edges" arrays.');
     }
 
     const nodes: GraphNode[] = [];

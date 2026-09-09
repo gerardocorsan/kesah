@@ -2,7 +2,7 @@ import { Graph, type EdgeId, type GraphEdge, type GraphNode, type NodeId } from 
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
-/** Radio de los nodos, en unidades del lienzo. */
+/** Node radius, in canvas units. */
 export const NODE_RADIUS = 24;
 const MIN_SCALE = 0.2;
 const MAX_SCALE = 4;
@@ -16,7 +16,7 @@ interface Point {
   y: number;
 }
 
-/** Gesto en curso: qué está haciendo el puntero entre pointerdown y pointerup. */
+/** Gesture in progress: what the pointer is doing between pointerdown and pointerup. */
 type Gesture =
   | { kind: 'none' }
   | { kind: 'drag-node'; id: NodeId; offsetX: number; offsetY: number }
@@ -44,9 +44,9 @@ function isTypingTarget(target: EventTarget | null): boolean {
 }
 
 /**
- * Editor visual: pinta el grafo en un <svg> y traduce ratón y táctil en
- * operaciones sobre el modelo. La verdad vive en `Graph`; aquí sólo hay
- * vista, selección y gestos.
+ * Visual editor: renders the graph in an <svg> and translates mouse and
+ * touch input into operations on the model. The source of truth is `Graph`;
+ * this class only holds the view, the selection and the gestures.
  */
 export class GraphEditor {
   readonly svg: SVGSVGElement;
@@ -117,7 +117,7 @@ export class GraphEditor {
     return this.connect;
   }
 
-  /** Con el modo conectar activo, arrastrar desde un nodo crea una arista en vez de moverlo. */
+  /** With connect mode on, dragging from a node creates an edge instead of moving it. */
   set connectMode(value: boolean) {
     this.connect = value;
     this.container.classList.toggle('connect-mode', value);
@@ -145,7 +145,7 @@ export class GraphEditor {
     else this.graph.removeEdge(selected.id);
   }
 
-  /** Encuadra todos los nodos en el lienzo, sin ampliar por encima de la escala 1. */
+  /** Fits every node in the canvas, without zooming in beyond scale 1. */
   fitView(padding = 48): void {
     const nodes = this.graph.nodeList;
     const { width, height } = this.svg.getBoundingClientRect();
@@ -175,7 +175,7 @@ export class GraphEditor {
     this.applyTransform();
   }
 
-  /** Repinta ahora mismo. Normalmente basta con `scheduleRender`, que agrupa cambios por fotograma. */
+  /** Repaints right now. Usually `scheduleRender` is enough, since it batches changes per frame. */
   render(): void {
     const selected = this.current;
     const stillExists =
@@ -226,7 +226,7 @@ export class GraphEditor {
     }
   }
 
-  // --- Gestos -----------------------------------------------------------
+  // --- Gestures ---------------------------------------------------------
 
   private readonly onPointerDown = (e: PointerEvent): void => {
     if (e.button !== 0 && e.button !== 1) return;
@@ -245,10 +245,10 @@ export class GraphEditor {
         this.updatePreview(node, point);
       } else {
         this.gesture = { kind: 'drag-node', id: nodeId, offsetX: point.x - node.x, offsetY: point.y - node.y };
-        // Lo trae al frente. Se hace antes de capturar: mover el elemento en el DOM soltaría la captura.
+        // Bring it to the front. Done before capturing: moving the element in the DOM would release the capture.
         if (this.nodeLayer.lastElementChild !== nodeEl) this.nodeLayer.append(nodeEl);
       }
-      // Se captura en el propio nodo (y no en el svg) para que click y dblclick sigan llegando a él.
+      // Capture on the node itself (not the svg) so click and dblclick keep targeting it.
       nodeEl.setPointerCapture(e.pointerId);
       return;
     }
@@ -258,7 +258,7 @@ export class GraphEditor {
       return;
     }
 
-    // Fondo con botón izquierdo, o botón central en cualquier sitio: desplazar el lienzo.
+    // Left button on the background, or middle button anywhere: pan the canvas.
     if (e.button === 0) this.select(null);
     this.gesture = { kind: 'pan', startX: e.clientX, startY: e.clientY, originX: this.tx, originY: this.ty };
     target.setPointerCapture(e.pointerId);
@@ -287,7 +287,7 @@ export class GraphEditor {
     this.gesture = { kind: 'none' };
     this.hidePreview();
     if (gesture.kind !== 'connect') return;
-    // Con la captura activa e.target es el nodo origen, así que se mira qué hay realmente bajo el puntero.
+    // While captured, e.target is the source node, so look at what is really under the pointer.
     const hit = document.elementFromPoint(e.clientX, e.clientY);
     const targetId = hit?.closest<SVGGElement>('.node')?.dataset.id;
     if (!targetId || targetId === gesture.source) return;
@@ -308,14 +308,14 @@ export class GraphEditor {
     if (nodeId) {
       const node = this.graph.getNode(nodeId);
       if (!node) return;
-      const label = window.prompt('Nombre del nodo:', node.label);
+      const label = window.prompt('Node name:', node.label);
       if (label !== null && label.trim() !== '') this.graph.setNodeLabel(nodeId, label.trim());
       return;
     }
     if (edgeId) {
       const edge = this.graph.getEdge(edgeId);
       if (!edge) return;
-      const label = window.prompt('Etiqueta de la arista (vacío para quitarla):', edge.label);
+      const label = window.prompt('Edge label (leave empty to remove it):', edge.label);
       if (label !== null) this.graph.setEdgeLabel(edgeId, label.trim());
       return;
     }
@@ -332,7 +332,7 @@ export class GraphEditor {
     const delta = e.deltaMode === WheelEvent.DOM_DELTA_LINE ? e.deltaY * 16 : e.deltaY;
     const next = clamp(this.scale * Math.exp(-delta * 0.0015), MIN_SCALE, MAX_SCALE);
     const ratio = next / this.scale;
-    // El punto del mundo que hay bajo el cursor se queda donde está.
+    // The world point under the cursor stays where it is.
     this.tx = mouseX - (mouseX - this.tx) * ratio;
     this.ty = mouseY - (mouseY - this.ty) * ratio;
     this.scale = next;
@@ -352,7 +352,7 @@ export class GraphEditor {
     }
   };
 
-  // --- Geometría y pintado ---------------------------------------------
+  // --- Geometry and painting -------------------------------------------
 
   private toWorld(clientX: number, clientY: number): Point {
     const rect = this.svg.getBoundingClientRect();
@@ -437,7 +437,7 @@ export class GraphEditor {
     const selected = this.current?.kind === 'edge' && this.current.id === edge.id;
     el.classList.toggle('selected', selected);
 
-    // La línea se recorta en el borde de cada círculo para que la flecha quede visible.
+    // The line is trimmed at the border of each circle so the arrowhead stays visible.
     const dx = target.x - source.x;
     const dy = target.y - source.y;
     const length = Math.hypot(dx, dy) || 1;

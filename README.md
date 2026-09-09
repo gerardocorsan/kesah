@@ -1,40 +1,40 @@
-# Kesah, editor visual de grafos
+# Kesah, visual graph editor
 
-Aplicación web para dibujar grafos (nodos y aristas) con el ratón. HTML + TypeScript, sin librerías en tiempo de ejecución: el dibujo es SVG puro y Vite sólo se usa para desarrollar y empaquetar.
+A web application for drawing graphs (nodes and edges) using the mouse. Built with HTML and TypeScript, with no runtime libraries: the drawing is pure SVG, and Vite is used only for development and bundling.
 
-## Puesta en marcha
+## Getting started
 
 ```bash
 npm install
-npm run dev      # servidor de desarrollo en http://localhost:5173
-npm run build    # comprueba tipos y genera dist/
-npm run preview  # sirve dist/ para probar la versión final
+npm run dev      # development server at http://localhost:5173
+npm run build    # type-check and generate dist/
+npm run preview  # serve dist/ to test the final version
 ```
 
-## Controles
+## Controls
 
-| Acción | Cómo |
+| Action | How to |
 | --- | --- |
-| Crear nodo | Doble clic en el fondo |
-| Mover nodo | Arrastrarlo |
-| Conectar dos nodos | Shift + arrastrar de uno a otro, o activar «Conectar» y arrastrar |
-| Renombrar nodo o etiquetar arista | Doble clic sobre él |
-| Seleccionar | Clic en un nodo o una arista |
-| Borrar | Supr o Retroceso con algo seleccionado, o botón «Borrar» |
-| Zoom | Rueda del ratón |
-| Desplazar el lienzo | Arrastrar el fondo, o botón central del ratón |
-| Dirigido / no dirigido | Casilla «Dirigido» |
+| Create node | Double-click the background |
+| Move node | Drag it |
+| Connect two nodes | Shift + drag from one to the other, or activate "Connect" mode and drag |
+| Rename node or label edge | Double-click it |
+| Select | Click a node or an edge |
+| Delete | Delete or Backspace key while selected, or "Delete" button |
+| Zoom | Mouse wheel |
+| Pan canvas | Drag the background, or use the middle mouse button |
+| Directed / undirected | "Directed" checkbox |
 
-El grafo se guarda solo en `localStorage`, así que sobrevive a recargar la página. «Exportar JSON» descarga el archivo e «Importar JSON» lo carga.
+The graph is automatically saved to `localStorage`, so it persists across page reloads. "Export JSON" downloads the file, and "Import JSON" loads it.
 
-## Estructura
+## Structure
 
-- `src/graph.ts`: el modelo. Nodos, aristas, validación del JSON y notificación de cambios. No toca el DOM.
-- `src/editor.ts`: la vista. Pinta el grafo en un `<svg>` y traduce los gestos del puntero en operaciones sobre el modelo.
-- `src/main.ts`: barra de herramientas, guardado automático, importación y exportación.
-- `src/style.css`: estilos de la interfaz y del lienzo.
+- `src/graph.ts`: the model. Nodes, edges, JSON validation, and change notifications. Does not touch the DOM.
+- `src/editor.ts`: the view. Renders the graph in an `<svg>` element and translates pointer gestures into operations on the model.
+- `src/main.ts`: toolbar, autosave, import, and export functionality.
+- `src/style.css`: interface and canvas styles.
 
-## Formato JSON
+## JSON format
 
 ```json
 {

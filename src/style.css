@@ -29,7 +29,7 @@ body {
   background: var(--bg);
 }
 
-/* Barra de herramientas */
+/* Toolbar */
 
 .toolbar {
   display: flex;
@@ -100,7 +100,7 @@ body {
   border-top: 1px solid var(--border);
 }
 
-/* Lienzo */
+/* Canvas */
 
 .canvas {
   flex: 1;
@@ -125,7 +125,7 @@ body {
   fill: var(--grid);
 }
 
-/* Nodos */
+/* Nodes */
 
 .node {
   cursor: grab;
@@ -151,7 +151,7 @@ body {
   pointer-events: none;
 }
 
-/* Aristas */
+/* Edges */
 
 .edge-hit {
   stroke: transparent;
