@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cline x1='9' y1='23' x2='23' y2='9' stroke='%236b7280' stroke-width='3'/%3E%3Ccircle cx='9' cy='23' r='6' fill='%232563eb'/%3E%3Ccircle cx='23' cy='9' r='6' fill='%232563eb'/%3E%3C/svg%3E" />
+    <title>Kesah · Editor de grafos</title>
+  </head>
+  <body>
+    <header class="toolbar">
+      <h1>Kesah</h1>
+      <button id="btn-new" type="button" title="Vaciar el lienzo">Nuevo</button>
+      <button id="btn-connect" type="button" aria-pressed="false" title="Modo conectar: arrastra de un nodo a otro. Atajo: mantener Shift">Conectar</button>
+      <label class="checkbox" title="Las aristas tienen sentido y se dibujan con flecha">
+        <input id="chk-directed" type="checkbox" checked /> Dirigido
+      </label>
+      <button id="btn-delete" type="button" disabled title="Borrar el nodo o la arista seleccionados (Supr)">Borrar</button>
+      <button id="btn-fit" type="button" title="Encuadrar todo el grafo">Ajustar vista</button>
+      <span class="spacer"></span>
+      <button id="btn-export" type="button">Exportar JSON</button>
+      <label class="button">Importar JSON<input id="file-import" type="file" accept="application/json,.json" hidden /></label>
+      <span id="status" class="status" aria-live="polite"></span>
+    </header>
+    <main id="canvas" class="canvas"></main>
+    <footer class="hint">
+      Doble clic en el fondo: nuevo nodo · Arrastrar un nodo: mover · Shift + arrastrar de un nodo a otro: conectar ·
+      Doble clic en nodo o arista: renombrar · Supr: borrar la selección · Rueda: zoom · Arrastrar el fondo: desplazar
+    </footer>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

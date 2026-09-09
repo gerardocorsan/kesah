@@ -1,0 +1,198 @@
+:root {
+  --bg: #f4f6f8;
+  --panel: #ffffff;
+  --border: #d5dae1;
+  --text: #1f2933;
+  --muted: #6b7280;
+  --accent: #2563eb;
+  --accent-strong: #1d4ed8;
+  --select: #f59e0b;
+  --edge: #6b7280;
+  --grid: #cfd5dc;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+/* Barra de herramientas */
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+
+.toolbar h1 {
+  margin: 0 0.5rem 0 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.toolbar button,
+.toolbar .button {
+  font: inherit;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.toolbar button:hover:not(:disabled),
+.toolbar .button:hover {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+
+.toolbar button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.toolbar button[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.toolbar .checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  cursor: pointer;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.status {
+  font-size: 0.85rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.hint {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+}
+
+/* Lienzo */
+
+.canvas {
+  flex: 1;
+  min-height: 0;
+}
+
+.graph-editor {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.canvas.connect-mode .graph-editor,
+.canvas.connect-mode .node {
+  cursor: crosshair;
+}
+
+.grid-dot {
+  fill: var(--grid);
+}
+
+/* Nodos */
+
+.node {
+  cursor: grab;
+}
+
+.node circle {
+  fill: #fff;
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+.node.selected circle {
+  stroke: var(--select);
+  stroke-width: 3;
+}
+
+.node text {
+  font-size: 13px;
+  font-weight: 500;
+  text-anchor: middle;
+  dominant-baseline: central;
+  fill: var(--text);
+  pointer-events: none;
+}
+
+/* Aristas */
+
+.edge-hit {
+  stroke: transparent;
+  stroke-width: 14;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+.edge-line {
+  stroke: var(--edge);
+  stroke-width: 2;
+  pointer-events: none;
+}
+
+.edge.selected .edge-line {
+  stroke: var(--select);
+  stroke-width: 3;
+}
+
+.edge-label {
+  font-size: 12px;
+  text-anchor: middle;
+  dominant-baseline: central;
+  fill: var(--muted);
+  paint-order: stroke;
+  stroke: var(--bg);
+  stroke-width: 4px;
+  pointer-events: none;
+}
+
+.arrow-head {
+  fill: var(--edge);
+}
+
+.arrow-head.selected {
+  fill: var(--select);
+}
+
+.edge-preview {
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+  pointer-events: none;
+}
