@@ -1,14 +1,10 @@
 import './style.css';
+import { byId } from './dom';
 import { Graph } from './graph';
 import { GraphEditor } from './editor';
+import { setupSidebar } from './sidebar';
 
 const STORAGE_KEY = 'kesah:graph';
-
-function byId<T extends HTMLElement>(id: string): T {
-  const el = document.getElementById(id);
-  if (!el) throw new Error(`Missing element #${id}`);
-  return el as T;
-}
 
 function count(n: number, singular: string, plural: string): string {
   return `${n} ${n === 1 ? singular : plural}`;
@@ -43,11 +39,10 @@ const graph = new Graph();
 if (!loadSaved(graph)) seedExample(graph);
 
 const editor = new GraphEditor(byId('canvas'), graph);
+setupSidebar(graph, editor);
 
 const btnNew = byId<HTMLButtonElement>('btn-new');
-const btnConnect = byId<HTMLButtonElement>('btn-connect');
 const chkDirected = byId<HTMLInputElement>('chk-directed');
-const btnDelete = byId<HTMLButtonElement>('btn-delete');
 const btnFit = byId<HTMLButtonElement>('btn-fit');
 const btnExport = byId<HTMLButtonElement>('btn-export');
 const fileImport = byId<HTMLInputElement>('file-import');
@@ -75,23 +70,13 @@ graph.onChange(() => {
   scheduleSave();
 });
 
-editor.onSelectionChange((selection) => {
-  btnDelete.disabled = selection === null;
-});
-
 btnNew.addEventListener('click', () => {
   if (graph.nodeCount > 0 && !window.confirm('Discard the current graph and start over?')) return;
   graph.clear();
   editor.fitView();
 });
 
-btnConnect.addEventListener('click', () => {
-  editor.connectMode = !editor.connectMode;
-  btnConnect.setAttribute('aria-pressed', String(editor.connectMode));
-});
-
 chkDirected.addEventListener('change', () => graph.setDirected(chkDirected.checked));
-btnDelete.addEventListener('click', () => editor.deleteSelection());
 btnFit.addEventListener('click', () => editor.fitView());
 
 btnExport.addEventListener('click', () => {

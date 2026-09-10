@@ -9,7 +9,9 @@ const MAX_SCALE = 4;
 const GRID_SIZE = 24;
 const LABEL_OFFSET = 12;
 
-export type Selection = { kind: 'node'; id: NodeId } | { kind: 'edge'; id: EdgeId } | null;
+/** A selected element: a node or an edge. */
+export type Selected = { kind: 'node'; id: NodeId } | { kind: 'edge'; id: EdgeId };
+export type Selection = Selected | null;
 
 interface Point {
   x: number;
@@ -58,6 +60,7 @@ export class GraphEditor {
   private readonly nodeEls = new Map<NodeId, SVGGElement>();
   private readonly edgeEls = new Map<EdgeId, SVGGElement>();
   private readonly selectionListeners = new Set<(selection: Selection) => void>();
+  private readonly editListeners = new Set<(target: Selected) => void>();
 
   private scale = 1;
   private tx = 0;
@@ -130,6 +133,14 @@ export class GraphEditor {
     };
   }
 
+  /** Called when the user asks to edit an element in place, for example by double-clicking it. */
+  onEditRequest(listener: (target: Selected) => void): () => void {
+    this.editListeners.add(listener);
+    return () => {
+      this.editListeners.delete(listener);
+    };
+  }
+
   select(selection: Selection): void {
     if (selection?.kind === this.current?.kind && selection?.id === this.current?.id) return;
     this.current = selection;
@@ -172,6 +183,26 @@ export class GraphEditor {
     this.scale = clamp(fit, MIN_SCALE, MAX_SCALE);
     this.tx = (width - contentWidth * this.scale) / 2 - minX * this.scale;
     this.ty = (height - contentHeight * this.scale) / 2 - minY * this.scale;
+    this.applyTransform();
+  }
+
+  /** Canvas coordinates of the middle of the visible area. */
+  viewCenter(): Point {
+    const rect = this.svg.getBoundingClientRect();
+    return this.toWorld(rect.left + rect.width / 2, rect.top + rect.height / 2);
+  }
+
+  /** Pans so the node is visible, keeping the current zoom. Does nothing if it is already in view. */
+  revealNode(id: NodeId): void {
+    const node = this.graph.getNode(id);
+    if (!node) return;
+    const { width, height } = this.svg.getBoundingClientRect();
+    const screenX = node.x * this.scale + this.tx;
+    const screenY = node.y * this.scale + this.ty;
+    const margin = NODE_RADIUS * this.scale + 8;
+    if (screenX >= margin && screenX <= width - margin && screenY >= margin && screenY <= height - margin) return;
+    this.tx = width / 2 - node.x * this.scale;
+    this.ty = height / 2 - node.y * this.scale;
     this.applyTransform();
   }
 
@@ -305,18 +336,15 @@ export class GraphEditor {
     const nodeId = target?.closest<SVGGElement>('.node')?.dataset.id;
     const edgeId = target?.closest<SVGGElement>('.edge')?.dataset.id;
 
-    if (nodeId) {
-      const node = this.graph.getNode(nodeId);
-      if (!node) return;
-      const label = window.prompt('Node name:', node.label);
-      if (label !== null && label.trim() !== '') this.graph.setNodeLabel(nodeId, label.trim());
-      return;
-    }
-    if (edgeId) {
-      const edge = this.graph.getEdge(edgeId);
-      if (!edge) return;
-      const label = window.prompt('Edge label (leave empty to remove it):', edge.label);
-      if (label !== null) this.graph.setEdgeLabel(edgeId, label.trim());
+    // Double-clicking an element selects it and asks the surrounding UI to edit it in place.
+    const hit: Selected | null = nodeId
+      ? { kind: 'node', id: nodeId }
+      : edgeId
+        ? { kind: 'edge', id: edgeId }
+        : null;
+    if (hit) {
+      this.select(hit);
+      for (const listener of this.editListeners) listener(hit);
       return;
     }
     const point = this.toWorld(e.clientX, e.clientY);
