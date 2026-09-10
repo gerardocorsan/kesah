@@ -2,8 +2,11 @@ import { Graph, type EdgeId, type GraphEdge, type GraphNode, type NodeId } from 
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
-/** Node radius, in canvas units. */
-export const NODE_RADIUS = 24;
+/** Node box, in canvas units. The width grows with the label; the height is fixed. */
+export const NODE_HEIGHT = 40;
+export const NODE_MIN_WIDTH = 72;
+const NODE_PADDING_X = 14;
+const NODE_CORNER = 8;
 const MIN_SCALE = 0.2;
 const MAX_SCALE = 4;
 const GRID_SIZE = 24;
@@ -16,6 +19,11 @@ export type Selection = Selected | null;
 interface Point {
   x: number;
   y: number;
+}
+
+interface Size {
+  width: number;
+  height: number;
 }
 
 /** Gesture in progress: what the pointer is doing between pointerdown and pointerup. */
@@ -36,6 +44,13 @@ function createSvg<K extends keyof SVGElementTagNameMap>(
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+/** Distance from the centre of a box to its border along the unit direction (ux, uy). */
+function boundaryDistance(size: Size, ux: number, uy: number): number {
+  const alongX = ux === 0 ? Infinity : size.width / 2 / Math.abs(ux);
+  const alongY = uy === 0 ? Infinity : size.height / 2 / Math.abs(uy);
+  return Math.min(alongX, alongY);
 }
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -59,6 +74,8 @@ export class GraphEditor {
   private readonly preview: SVGLineElement;
   private readonly nodeEls = new Map<NodeId, SVGGElement>();
   private readonly edgeEls = new Map<EdgeId, SVGGElement>();
+  /** Measured box of each drawn node; the model itself has no size. */
+  private readonly nodeSizes = new Map<NodeId, Size>();
   private readonly selectionListeners = new Set<(selection: Selection) => void>();
   private readonly editListeners = new Set<(target: Selected) => void>();
 
@@ -172,10 +189,11 @@ export class GraphEditor {
     let maxX = -Infinity;
     let maxY = -Infinity;
     for (const node of nodes) {
-      minX = Math.min(minX, node.x - NODE_RADIUS);
-      minY = Math.min(minY, node.y - NODE_RADIUS);
-      maxX = Math.max(maxX, node.x + NODE_RADIUS);
-      maxY = Math.max(maxY, node.y + NODE_RADIUS);
+      const { width: w, height: h } = this.sizeOf(node.id);
+      minX = Math.min(minX, node.x - w / 2);
+      minY = Math.min(minY, node.y - h / 2);
+      maxX = Math.max(maxX, node.x + w / 2);
+      maxY = Math.max(maxY, node.y + h / 2);
     }
     const contentWidth = maxX - minX;
     const contentHeight = maxY - minY;
@@ -199,8 +217,10 @@ export class GraphEditor {
     const { width, height } = this.svg.getBoundingClientRect();
     const screenX = node.x * this.scale + this.tx;
     const screenY = node.y * this.scale + this.ty;
-    const margin = NODE_RADIUS * this.scale + 8;
-    if (screenX >= margin && screenX <= width - margin && screenY >= margin && screenY <= height - margin) return;
+    const size = this.sizeOf(id);
+    const marginX = (size.width / 2) * this.scale + 8;
+    const marginY = (size.height / 2) * this.scale + 8;
+    if (screenX >= marginX && screenX <= width - marginX && screenY >= marginY && screenY <= height - marginY) return;
     this.tx = width / 2 - node.x * this.scale;
     this.ty = height / 2 - node.y * this.scale;
     this.applyTransform();
@@ -232,6 +252,7 @@ export class GraphEditor {
       if (!liveNodes.has(id)) {
         el.remove();
         this.nodeEls.delete(id);
+        this.nodeSizes.delete(id);
       }
     }
 
@@ -438,9 +459,13 @@ export class GraphEditor {
     return marker;
   }
 
+  private sizeOf(id: NodeId): Size {
+    return this.nodeSizes.get(id) ?? { width: NODE_MIN_WIDTH, height: NODE_HEIGHT };
+  }
+
   private createNodeEl(id: NodeId): SVGGElement {
     const group = createSvg('g', { class: 'node', 'data-id': id });
-    group.append(createSvg('circle', { r: NODE_RADIUS }), createSvg('text'));
+    group.append(createSvg('rect', { rx: NODE_CORNER, ry: NODE_CORNER }), createSvg('text'));
     return group;
   }
 
@@ -448,7 +473,17 @@ export class GraphEditor {
     el.setAttribute('transform', `translate(${node.x} ${node.y})`);
     el.classList.toggle('selected', this.current?.kind === 'node' && this.current.id === node.id);
     const text = el.querySelector('text');
-    if (text && text.textContent !== node.label) text.textContent = node.label;
+    const box = el.querySelector('rect');
+    if (!text || !box) return;
+    if (text.textContent === node.label && this.nodeSizes.has(node.id)) return;
+    // Measuring the text forces a layout, so the box is only resized when the label changes.
+    text.textContent = node.label;
+    const width = Math.max(NODE_MIN_WIDTH, Math.ceil(text.getComputedTextLength()) + 2 * NODE_PADDING_X);
+    this.nodeSizes.set(node.id, { width, height: NODE_HEIGHT });
+    box.setAttribute('x', String(-width / 2));
+    box.setAttribute('y', String(-NODE_HEIGHT / 2));
+    box.setAttribute('width', String(width));
+    box.setAttribute('height', String(NODE_HEIGHT));
   }
 
   private createEdgeEl(id: EdgeId): SVGGElement {
@@ -465,17 +500,18 @@ export class GraphEditor {
     const selected = this.current?.kind === 'edge' && this.current.id === edge.id;
     el.classList.toggle('selected', selected);
 
-    // The line is trimmed at the border of each circle so the arrowhead stays visible.
+    // The line is trimmed at the border of each box so the arrowhead stays visible.
     const dx = target.x - source.x;
     const dy = target.y - source.y;
     const length = Math.hypot(dx, dy) || 1;
     const ux = dx / length;
     const uy = dy / length;
-    const gap = NODE_RADIUS + 1;
-    const x1 = source.x + ux * gap;
-    const y1 = source.y + uy * gap;
-    const x2 = target.x - ux * gap;
-    const y2 = target.y - uy * gap;
+    const startGap = boundaryDistance(this.sizeOf(source.id), ux, uy) + 1;
+    const endGap = boundaryDistance(this.sizeOf(target.id), ux, uy) + 1;
+    const x1 = source.x + ux * startGap;
+    const y1 = source.y + uy * startGap;
+    const x2 = target.x - ux * endGap;
+    const y2 = target.y - uy * endGap;
 
     for (const line of el.querySelectorAll('line')) {
       line.setAttribute('x1', String(x1));

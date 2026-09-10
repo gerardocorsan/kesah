@@ -1,6 +1,6 @@
 import { byId } from './dom';
 import { Graph } from './graph';
-import { GraphEditor, NODE_RADIUS } from './editor';
+import { GraphEditor, NODE_HEIGHT, NODE_MIN_WIDTH } from './editor';
 
 interface Point {
   x: number;
@@ -9,13 +9,14 @@ interface Point {
 
 /** First spot at or near `start` that does not overlap an existing node. */
 function freeSpot(graph: Graph, start: Point): Point {
-  const minDistance = NODE_RADIUS * 2.5;
   const spot = { ...start };
   for (let i = 0; i < 50; i++) {
-    const taken = graph.nodeList.some((node) => Math.hypot(node.x - spot.x, node.y - spot.y) < minDistance);
+    const taken = graph.nodeList.some(
+      (node) => Math.abs(node.x - spot.x) < NODE_MIN_WIDTH + 8 && Math.abs(node.y - spot.y) < NODE_HEIGHT + 8,
+    );
     if (!taken) break;
-    spot.x += NODE_RADIUS * 2;
-    spot.y += NODE_RADIUS * 2;
+    spot.x += NODE_MIN_WIDTH / 2;
+    spot.y += NODE_HEIGHT + 16;
   }
   return spot;
 }

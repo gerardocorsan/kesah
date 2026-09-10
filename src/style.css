@@ -270,13 +270,13 @@ button.danger:hover:not(:disabled) {
   cursor: grab;
 }
 
-.node circle {
+.node rect {
   fill: #fff;
   stroke: var(--accent);
   stroke-width: 2;
 }
 
-.node.selected circle {
+.node.selected rect {
   stroke: var(--select);
   stroke-width: 3;
 }
