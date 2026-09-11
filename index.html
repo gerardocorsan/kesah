@@ -27,7 +27,7 @@
         <section class="panel">
           <h2>Add node</h2>
           <div id="add-node-tools" class="tool-grid"></div>
-          <button id="btn-connect" type="button" aria-pressed="false" title="Connect mode: drag from one node to another. Shortcut: hold Shift">Connect</button>
+          <button id="btn-connect" type="button" aria-pressed="false" title="Connect mode: drag from one node to another. Press C to toggle it, Escape to leave it, or hold Shift for a single edge">Connect <kbd>C</kbd></button>
         </section>
         <section class="panel">
           <h2 id="inspector-title">Selection</h2>
@@ -62,7 +62,8 @@
     </div>
     <footer class="hint">
       Double-click the background: new node · Drag a node: move · Drag a side handle (or Shift + drag) from one node to another: connect ·
-      Double-click a node or edge: rename · Delete: remove the selection · Wheel: zoom · Drag the background: pan
+      C: toggle connect mode · Double-click a node or edge: rename · Delete: remove the selection · Escape: deselect ·
+      Wheel: zoom · Drag the background: pan
     </footer>
     <script type="module" src="/src/main.ts"></script>
   </body>

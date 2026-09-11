@@ -191,8 +191,10 @@ export function setupSidebar(graph: Graph, editor: GraphEditor): void {
 
   btnConnect.addEventListener('click', () => {
     editor.connectMode = !editor.connectMode;
-    btnConnect.setAttribute('aria-pressed', String(editor.connectMode));
   });
+  // The mode can also change from the keyboard (C toggles it, Escape leaves it), so the button follows the editor.
+  editor.onConnectModeChange((on) => btnConnect.setAttribute('aria-pressed', String(on)));
+  btnConnect.setAttribute('aria-pressed', String(editor.connectMode));
 
   btnDelete.addEventListener('click', () => editor.deleteSelection());
 

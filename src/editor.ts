@@ -70,6 +70,7 @@ export class GraphEditor {
   private readonly nodeSizes = new Map<NodeId, Size>();
   private readonly selectionListeners = new Set<(selection: Selection) => void>();
   private readonly editListeners = new Set<(target: Selected) => void>();
+  private readonly connectListeners = new Set<(on: boolean) => void>();
 
   private scale = 1;
   private tx = 0;
@@ -129,10 +130,20 @@ export class GraphEditor {
     return this.connect;
   }
 
-  /** With connect mode on, dragging from a node creates an edge instead of moving it. */
+  /** With connect mode on, dragging from a node creates an edge instead of moving it. Toggled with the C key too. */
   set connectMode(value: boolean) {
+    if (this.connect === value) return;
     this.connect = value;
     this.container.classList.toggle('connect-mode', value);
+    for (const listener of this.connectListeners) listener(value);
+  }
+
+  /** Called whenever connect mode is switched on or off, from the UI or the keyboard. */
+  onConnectModeChange(listener: (on: boolean) => void): () => void {
+    this.connectListeners.add(listener);
+    return () => {
+      this.connectListeners.delete(listener);
+    };
   }
 
   onSelectionChange(listener: (selection: Selection) => void): () => void {
@@ -391,7 +402,10 @@ export class GraphEditor {
       this.deleteSelection();
     } else if (e.key === 'Escape') {
       this.endGesture();
+      this.connectMode = false;
       this.select(null);
+    } else if ((e.key === 'c' || e.key === 'C') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      this.connectMode = !this.connectMode;
     }
   };
 

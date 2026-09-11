@@ -18,12 +18,14 @@ npm run preview  # serve dist/ to test the final version
 | Create node | Pick a shape under "Add node" in the left panel, or double-click the background for a process |
 | Change a node's shape | Select it and pick another shape in the left panel |
 | Move node | Drag it |
-| Connect two nodes | Drag from a side handle of one node to a side handle (or the body) of another. Shift + drag, or "Connect" mode in the left panel, also works and picks the sides automatically |
+| Connect two nodes | Drag from a side handle of one node to a side handle (or the body) of another. Shift + drag, or connect mode, also works and picks the sides automatically |
+| Connect mode | Press C or click "Connect" in the left panel to toggle it; while it is on, dragging a node connects instead of moving. Escape leaves it |
 | Choose the sides an edge uses | Select the edge and set "From side" and "To side" in the left panel ("Auto" picks them from the layout) |
 | Straight or elbowed edges | "Orthogonal" checkbox in the toolbar |
 | Rename node or label edge | Select it and edit the name in the left panel, or double-click it |
 | Select | Click a node or an edge, or click a name in the node list of the left panel |
 | Delete | Delete or Backspace key while selected, or "Delete" in the left panel |
+| Deselect | Escape |
 | Zoom | Mouse wheel |
 | Pan canvas | Drag the background, or use the middle mouse button |
 | Directed / undirected | "Directed" checkbox |
