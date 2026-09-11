@@ -1,0 +1,50 @@
+/* Design tokens and page-level reset. Component styles live next to each component. */
+
+:root {
+  --bg: #f4f6f8;
+  --panel: #ffffff;
+  --border: #d5dae1;
+  --text: #1f2933;
+  --muted: #6b7280;
+  --accent: #2563eb;
+  --accent-strong: #1d4ed8;
+  --accent-soft: #e8effd;
+  --danger: #dc2626;
+  --select: #f59e0b;
+  --edge: #6b7280;
+  --grid: #cfd5dc;
+  --sidebar-width: 240px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Component rules set display on some elements; the hidden attribute must still win. */
+[hidden] {
+  display: none !important;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.muted {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}

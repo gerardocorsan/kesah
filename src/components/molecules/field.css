@@ -1,0 +1,11 @@
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.field .control {
+  width: 100%;
+}

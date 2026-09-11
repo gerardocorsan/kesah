@@ -7,64 +7,7 @@
     <title>Kesah · Graph editor</title>
   </head>
   <body>
-    <header class="toolbar">
-      <h1>Kesah</h1>
-      <button id="btn-new" type="button" title="Clear the canvas">New</button>
-      <label class="checkbox" title="Edges have a direction and are drawn with an arrowhead">
-        <input id="chk-directed" type="checkbox" checked /> Directed
-      </label>
-      <label class="checkbox" title="Edges run along axis-aligned segments with elbows instead of straight lines">
-        <input id="chk-orthogonal" type="checkbox" checked /> Orthogonal
-      </label>
-      <button id="btn-fit" type="button" title="Fit the whole graph in view">Fit view</button>
-      <span class="spacer"></span>
-      <button id="btn-export" type="button">Export JSON</button>
-      <label class="button">Import JSON<input id="file-import" type="file" accept="application/json,.json" hidden /></label>
-      <span id="status" class="status" aria-live="polite"></span>
-    </header>
-    <div class="workspace">
-      <aside class="sidebar" aria-label="Graph tools">
-        <section class="panel">
-          <h2>Add node</h2>
-          <div id="add-node-tools" class="tool-grid"></div>
-          <button id="btn-connect" type="button" aria-pressed="false" title="Connect mode: drag from one node to another. Press C to toggle it, Escape to leave it, or hold Shift for a single edge">Connect <kbd>C</kbd></button>
-        </section>
-        <section class="panel">
-          <h2 id="inspector-title">Selection</h2>
-          <p id="inspector-empty" class="muted">Click a node or an edge to edit it.</p>
-          <form id="inspector-form" hidden>
-            <label class="field">
-              <span id="label-text">Name</span>
-              <input id="inp-label" type="text" autocomplete="off" spellcheck="false" />
-            </label>
-            <label class="field" id="type-field">
-              <span>Shape</span>
-              <select id="sel-type"></select>
-            </label>
-            <label class="field" id="source-side-field" hidden>
-              <span>From side</span>
-              <select id="sel-source-side"></select>
-            </label>
-            <label class="field" id="target-side-field" hidden>
-              <span>To side</span>
-              <select id="sel-target-side"></select>
-            </label>
-            <p id="inspector-info" class="muted"></p>
-            <button id="btn-delete" type="button" class="danger" title="Delete the selected node or edge (Delete key)">Delete</button>
-          </form>
-        </section>
-        <section class="panel panel-grow">
-          <h2>Nodes <span id="node-count" class="count"></span></h2>
-          <ul id="node-list" class="node-list"></ul>
-        </section>
-      </aside>
-      <main id="canvas" class="canvas"></main>
-    </div>
-    <footer class="hint">
-      Double-click the background: new node · Drag a node: move · Drag a side handle (or Shift + drag) from one node to another: connect ·
-      C: toggle connect mode · Double-click a node or edge: rename · Delete: remove the selection · Escape: deselect ·
-      Wheel: zoom · Drag the background: pan
-    </footer>
-    <script type="module" src="/src/main.ts"></script>
+    <div id="app"></div>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

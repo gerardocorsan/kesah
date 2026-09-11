@@ -1,6 +1,6 @@
 # Kesah, visual graph editor
 
-A web application for drawing graphs (nodes and edges) using the mouse. Built with HTML and TypeScript, with no runtime libraries: the drawing is pure SVG, and Vite is used only for development and bundling.
+A web application for drawing flowcharts and graphs (nodes and edges) using the mouse. Built with TypeScript and [SolidJS](https://www.solidjs.com/), the only runtime dependency: the drawing is plain SVG rendered by Solid components, and Vite is used for development and bundling.
 
 ## Getting started
 
@@ -47,14 +47,20 @@ The four classic flowchart symbols. Every shape grows horizontally to fit its la
 
 ## Structure
 
-- `src/graph.ts`: the model. Nodes, edges, JSON validation, and change notifications. Does not touch the DOM.
-- `src/shapes.ts`: geometry of the node shapes. Size for a label, SVG outline, side handle positions and where an edge meets the border. No DOM either.
-- `src/routing.ts`: edge routing. Automatic side choice, orthogonal routes with elbows, rounded paths, label placement and fan-out of parallel edges. No DOM either.
-- `src/editor.ts`: the view. Renders the graph in an `<svg>` element and translates pointer gestures into operations on the model.
-- `src/sidebar.ts`: the left panel. Editing tools, the properties of the selected element and the node list.
-- `src/main.ts`: toolbar, autosave, import, and export functionality.
-- `src/dom.ts`: a small DOM lookup helper.
-- `src/style.css`: interface and canvas styles.
+The model is framework-free; the interface is made of Solid components organised by [atomic design](https://atomicdesign.bradfrost.com/) levels, each with its stylesheet next to it.
+
+- `src/model/`: no DOM anywhere in here.
+  - `graph.ts`: nodes, edges, JSON validation and change notifications.
+  - `shapes.ts`: geometry of the node shapes. Size for a label, SVG outline, side handle positions and where an edge meets the border.
+  - `routing.ts`: automatic side choice, orthogonal routes with elbows, rounded paths, label placement and fan-out of parallel edges.
+  - `layout.ts`: resolves the sides and offsets of every edge, computes the points it passes through, and finds a free spot for a new node.
+- `src/state/app.tsx`: the application state. A reactive view over the graph (a revision signal bumped on every change) plus selection, modes, camera and the measured node sizes, provided to components through context.
+- `src/components/atoms/`: Button, Checkbox, TextInput, Select, Kbd, ShapeIcon, Muted.
+- `src/components/molecules/`: Field, ToolButton, ShapePicker, NodeListItem, FileButton, and the SVG pieces of the canvas: GridPattern, ArrowMarkers, NodeShape, EdgePath.
+- `src/components/organisms/`: Toolbar, ToolsPanel, InspectorPanel, NodeListPanel and GraphCanvas. `gestures.ts` holds the pointer, wheel and keyboard handling of the canvas.
+- `src/components/templates/AppLayout.tsx`: toolbar on top, side panel and canvas in the middle, hint at the bottom.
+- `src/App.tsx` and `src/main.tsx`: root component, persistence in `localStorage` and the sample flowchart.
+- `src/styles/tokens.css`: colour variables and the page reset.
 
 ## JSON format
 

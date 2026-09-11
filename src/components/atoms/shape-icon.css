@@ -1,0 +1,11 @@
+.shape-icon {
+  flex: none;
+  width: 32px;
+  height: 20px;
+}
+
+.shape-icon path {
+  fill: #fff;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}

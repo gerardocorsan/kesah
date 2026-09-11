@@ -1,0 +1,32 @@
+.btn.node-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  text-align: left;
+  padding: 0.3rem 0.5rem;
+  border-color: transparent;
+}
+
+.btn.node-item:hover:not(:disabled) {
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.btn.node-item.active,
+.btn.node-item.active:hover:not(:disabled) {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-strong);
+}
+
+.node-item .shape-icon {
+  width: 24px;
+  height: 15px;
+}
+
+.node-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

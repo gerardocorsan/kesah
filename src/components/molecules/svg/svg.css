@@ -1,0 +1,104 @@
+/* Canvas drawing: grid, nodes, side handles, edges and arrowheads. */
+
+.grid-dot {
+  fill: var(--grid);
+}
+
+/* Nodes */
+
+.node {
+  cursor: grab;
+}
+
+.node path {
+  fill: #fff;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.node.selected path {
+  stroke: var(--select);
+  stroke-width: 3;
+}
+
+.node text {
+  font-size: 13px;
+  font-weight: 500;
+  text-anchor: middle;
+  dominant-baseline: central;
+  fill: var(--text);
+  pointer-events: none;
+}
+
+/* Side handles: hidden until the node is hovered or selected, or while an edge is being dragged. */
+
+.port {
+  fill: #fff;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  opacity: 0;
+  pointer-events: none;
+  cursor: crosshair;
+  transition: opacity 0.12s;
+}
+
+.node:hover .port,
+.node.selected .port,
+.connecting .port {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.port:hover {
+  fill: var(--accent);
+}
+
+/* Edges */
+
+.edge-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 14;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+.edge-line {
+  fill: none;
+  stroke: var(--edge);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.edge.selected .edge-line {
+  stroke: var(--select);
+  stroke-width: 3;
+}
+
+.edge-label {
+  font-size: 12px;
+  text-anchor: middle;
+  dominant-baseline: central;
+  fill: var(--muted);
+  paint-order: stroke;
+  stroke: var(--bg);
+  stroke-width: 4px;
+  pointer-events: none;
+}
+
+.arrow-head {
+  fill: var(--edge);
+}
+
+.arrow-head.selected {
+  fill: var(--select);
+}
+
+.edge-preview {
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+  pointer-events: none;
+}

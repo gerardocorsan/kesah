@@ -1,0 +1,42 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.panel h2 {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.panel h2 .count {
+  font-weight: 400;
+}
+
+.panel form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.panel-grow {
+  flex: 1;
+  min-height: 0;
+  border-bottom: none;
+}
+
+.node-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}

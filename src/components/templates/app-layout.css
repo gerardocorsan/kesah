@@ -1,0 +1,37 @@
+.workspace {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.sidebar {
+  flex: none;
+  width: var(--sidebar-width);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+}
+
+.hint {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+}
+
+@media (max-width: 700px) {
+  .workspace {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: auto;
+    max-height: 45%;
+    overflow-y: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+}
