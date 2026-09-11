@@ -11,6 +11,17 @@ npm run build    # type-check and generate dist/
 npm run preview  # serve dist/ to test the final version
 ```
 
+## Tests
+
+```bash
+npm test                        # unit tests with coverage; fails below 85 % on any metric
+npm run test:watch              # unit tests in watch mode
+npm run test:e2e                # end-to-end smoke test in a headless Chrome (run `npm run build` first)
+node scripts/verify-tests.mjs   # mutation check: breaks each unit and expects its tests to fail
+```
+
+Unit tests live next to the code (`*.test.ts` / `*.test.tsx`) and run with Vitest in jsdom. `src/test/setup.ts` provides what jsdom lacks (text measurement, pointer capture, hit-testing). The end-to-end script drives the production build through the Chrome DevTools protocol; set `CHROME_BIN` if Chrome is not `google-chrome`.
+
 ## Controls
 
 | Action | How to |

@@ -30,8 +30,13 @@ function simplify(points: Point[]): Point[] {
     if (last && last.x === p.x && last.y === p.y) continue;
     const prev = out[out.length - 2];
     const collinear = last && prev && ((prev.x === last.x && last.x === p.x) || (prev.y === last.y && last.y === p.y));
-    if (collinear) out[out.length - 1] = p;
-    else out.push(p);
+    if (collinear) {
+      out[out.length - 1] = p;
+      // A route that folds back onto the previous point would leave a zero-length segment: drop it.
+      if (prev.x === p.x && prev.y === p.y) out.pop();
+    } else {
+      out.push(p);
+    }
   }
   return out;
 }
