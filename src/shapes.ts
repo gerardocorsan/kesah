@@ -1,10 +1,19 @@
-import type { NodeType } from './graph';
+import type { NodeType, Side } from './graph';
 
 /** Pure geometry of the flowchart symbols. No DOM here: the editor turns these into SVG. */
+
+export interface Point {
+  x: number;
+  y: number;
+}
 
 export interface Size {
   width: number;
   height: number;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }
 
 const HEIGHT = 40;
@@ -92,6 +101,69 @@ function rhombusDistance(size: Size, ux: number, uy: number): number {
   const a = size.width / 2;
   const b = size.height / 2;
   return 1 / (Math.abs(ux) / a + Math.abs(uy) / b);
+}
+
+/** Outward unit vector of a side. */
+export function sideNormal(side: Side): Point {
+  switch (side) {
+    case 'top':
+      return { x: 0, y: -1 };
+    case 'right':
+      return { x: 1, y: 0 };
+    case 'bottom':
+      return { x: 0, y: 1 };
+    case 'left':
+      return { x: -1, y: 0 };
+  }
+}
+
+/** Distance from the centre line to the outline on the given side, `offset` units along that side. */
+function outlineExtent(type: NodeType, size: Size, side: Side, offset: number): number {
+  const w = size.width / 2;
+  const h = size.height / 2;
+  const vertical = side === 'top' || side === 'bottom';
+  const o = Math.abs(offset);
+  switch (type) {
+    case 'decision':
+      return vertical ? h * (1 - o / w) : w * (1 - o / h);
+    case 'terminal': {
+      const r = h;
+      const s = Math.max(0, w - r);
+      if (vertical) return o <= s ? r : Math.sqrt(Math.max(0, r * r - (o - s) ** 2));
+      return s + Math.sqrt(Math.max(0, r * r - o * o));
+    }
+    case 'io': {
+      if (vertical) return h;
+      // The right side runs from (w, -h) to (w - skew, h); the left one from (-w + skew, -h) to (-w, h).
+      const t = (offset + h) / size.height; // 0 at the top, 1 at the bottom
+      const skew = ioSkew(size.height);
+      return side === 'right' ? w - skew * t : w - skew * (1 - t);
+    }
+    case 'process':
+      return vertical ? h : w;
+  }
+}
+
+/**
+ * Point on the outline, relative to the centre, on the given side and `offset`
+ * units along it (to the right for top/bottom, downwards for left/right).
+ * The offset is clamped so the point stays on the shape.
+ */
+export function pointOnSide(type: NodeType, size: Size, side: Side, offset = 0): Point {
+  const vertical = side === 'top' || side === 'bottom';
+  const limit = Math.max(0, (vertical ? size.width : size.height) / 2 - 10);
+  const o = clamp(offset, -limit, limit);
+  const extent = outlineExtent(type, size, side, o);
+  switch (side) {
+    case 'top':
+      return { x: o, y: -extent };
+    case 'bottom':
+      return { x: o, y: extent };
+    case 'right':
+      return { x: extent, y: o };
+    case 'left':
+      return { x: -extent, y: o };
+  }
 }
 
 /**

@@ -27,15 +27,15 @@ function seedExample(graph: Graph): void {
   const start = graph.addNode(300, 60, 'Start', 'terminal');
   const read = graph.addNode(300, 150, 'Read input', 'io');
   const valid = graph.addNode(300, 250, 'Valid?', 'decision');
-  const process = graph.addNode(160, 350, 'Process data', 'process');
-  const error = graph.addNode(440, 350, 'Show error', 'process');
-  const end = graph.addNode(300, 450, 'End', 'terminal');
-  graph.addEdge(start.id, read.id);
-  graph.addEdge(read.id, valid.id);
-  graph.addEdge(valid.id, process.id, 'Yes');
-  graph.addEdge(valid.id, error.id, 'No');
-  graph.addEdge(process.id, end.id);
-  graph.addEdge(error.id, end.id);
+  const process = graph.addNode(140, 360, 'Process data', 'process');
+  const error = graph.addNode(460, 360, 'Show error', 'process');
+  const end = graph.addNode(300, 470, 'End', 'terminal');
+  graph.addEdge(start.id, read.id, '', { sourceSide: 'bottom', targetSide: 'top' });
+  graph.addEdge(read.id, valid.id, '', { sourceSide: 'bottom', targetSide: 'top' });
+  graph.addEdge(valid.id, process.id, 'Yes', { sourceSide: 'left', targetSide: 'top' });
+  graph.addEdge(valid.id, error.id, 'No', { sourceSide: 'right', targetSide: 'top' });
+  graph.addEdge(process.id, end.id, '', { sourceSide: 'bottom', targetSide: 'left' });
+  graph.addEdge(error.id, end.id, '', { sourceSide: 'bottom', targetSide: 'right' });
 }
 
 const graph = new Graph();
@@ -46,6 +46,7 @@ setupSidebar(graph, editor);
 
 const btnNew = byId<HTMLButtonElement>('btn-new');
 const chkDirected = byId<HTMLInputElement>('chk-directed');
+const chkOrthogonal = byId<HTMLInputElement>('chk-orthogonal');
 const btnFit = byId<HTMLButtonElement>('btn-fit');
 const btnExport = byId<HTMLButtonElement>('btn-export');
 const fileImport = byId<HTMLInputElement>('file-import');
@@ -66,6 +67,7 @@ function scheduleSave(): void {
 function refresh(): void {
   status.textContent = `${count(graph.nodeCount, 'node', 'nodes')} · ${count(graph.edgeCount, 'edge', 'edges')}`;
   chkDirected.checked = graph.directed;
+  chkOrthogonal.checked = graph.edgeStyle === 'orthogonal';
 }
 
 graph.onChange(() => {
@@ -80,6 +82,7 @@ btnNew.addEventListener('click', () => {
 });
 
 chkDirected.addEventListener('change', () => graph.setDirected(chkDirected.checked));
+chkOrthogonal.addEventListener('change', () => graph.setEdgeStyle(chkOrthogonal.checked ? 'orthogonal' : 'straight'));
 btnFit.addEventListener('click', () => editor.fitView());
 
 btnExport.addEventListener('click', () => {

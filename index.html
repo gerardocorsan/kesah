@@ -13,6 +13,9 @@
       <label class="checkbox" title="Edges have a direction and are drawn with an arrowhead">
         <input id="chk-directed" type="checkbox" checked /> Directed
       </label>
+      <label class="checkbox" title="Edges run along axis-aligned segments with elbows instead of straight lines">
+        <input id="chk-orthogonal" type="checkbox" checked /> Orthogonal
+      </label>
       <button id="btn-fit" type="button" title="Fit the whole graph in view">Fit view</button>
       <span class="spacer"></span>
       <button id="btn-export" type="button">Export JSON</button>
@@ -38,6 +41,14 @@
               <span>Shape</span>
               <select id="sel-type"></select>
             </label>
+            <label class="field" id="source-side-field" hidden>
+              <span>From side</span>
+              <select id="sel-source-side"></select>
+            </label>
+            <label class="field" id="target-side-field" hidden>
+              <span>To side</span>
+              <select id="sel-target-side"></select>
+            </label>
             <p id="inspector-info" class="muted"></p>
             <button id="btn-delete" type="button" class="danger" title="Delete the selected node or edge (Delete key)">Delete</button>
           </form>
@@ -50,7 +61,7 @@
       <main id="canvas" class="canvas"></main>
     </div>
     <footer class="hint">
-      Double-click the background: new node · Drag a node: move · Shift + drag from one node to another: connect ·
+      Double-click the background: new node · Drag a node: move · Drag a side handle (or Shift + drag) from one node to another: connect ·
       Double-click a node or edge: rename · Delete: remove the selection · Wheel: zoom · Drag the background: pan
     </footer>
     <script type="module" src="/src/main.ts"></script>

@@ -331,9 +331,33 @@ button.danger:hover:not(:disabled) {
   pointer-events: none;
 }
 
+/* Side handles: hidden until the node is hovered or selected, or while an edge is being dragged. */
+
+.port {
+  fill: #fff;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  opacity: 0;
+  pointer-events: none;
+  cursor: crosshair;
+  transition: opacity 0.12s;
+}
+
+.node:hover .port,
+.node.selected .port,
+.connecting .port {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.port:hover {
+  fill: var(--accent);
+}
+
 /* Edges */
 
 .edge-hit {
+  fill: none;
   stroke: transparent;
   stroke-width: 14;
   pointer-events: stroke;
@@ -341,8 +365,10 @@ button.danger:hover:not(:disabled) {
 }
 
 .edge-line {
+  fill: none;
   stroke: var(--edge);
   stroke-width: 2;
+  stroke-linejoin: round;
   pointer-events: none;
 }
 

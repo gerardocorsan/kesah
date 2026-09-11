@@ -1,5 +1,5 @@
 import { byId } from './dom';
-import { Graph, NODE_TYPES, isNodeType, type NodeType } from './graph';
+import { Graph, NODE_TYPES, SIDES, isNodeType, isSide, type NodeType, type Side } from './graph';
 import { GraphEditor } from './editor';
 import { shapePath, shapeSize } from './shapes';
 
@@ -17,6 +17,8 @@ const NODE_TYPE_INFO: Record<NodeType, { name: string; title: string }> = {
   decision: { name: 'Decision', title: 'A question, with one outgoing edge per answer' },
   io: { name: 'Input / Output', title: 'Data entering or leaving the flow' },
 };
+
+const SIDE_NAMES: Record<Side, string> = { top: 'Top', right: 'Right', bottom: 'Bottom', left: 'Left' };
 
 /** Small inline SVG showing the outline of a node type. */
 function shapeIcon(type: NodeType): SVGSVGElement {
@@ -61,6 +63,10 @@ export function setupSidebar(graph: Graph, editor: GraphEditor): void {
   const labelInput = byId<HTMLInputElement>('inp-label');
   const typeField = byId<HTMLElement>('type-field');
   const typeSelect = byId<HTMLSelectElement>('sel-type');
+  const sourceSideField = byId<HTMLElement>('source-side-field');
+  const sourceSideSelect = byId<HTMLSelectElement>('sel-source-side');
+  const targetSideField = byId<HTMLElement>('target-side-field');
+  const targetSideSelect = byId<HTMLSelectElement>('sel-target-side');
   const nodeList = byId<HTMLUListElement>('node-list');
   const nodeCount = byId<HTMLElement>('node-count');
   let listSignature = '';
@@ -82,6 +88,20 @@ export function setupSidebar(graph: Graph, editor: GraphEditor): void {
     typeSelect.append(option);
   }
 
+  // Side selectors for edges: "Auto" (empty value) plus the four sides.
+  for (const select of [sourceSideSelect, targetSideSelect]) {
+    const auto = document.createElement('option');
+    auto.value = '';
+    auto.textContent = 'Auto';
+    select.append(auto);
+    for (const side of SIDES) {
+      const option = document.createElement('option');
+      option.value = side;
+      option.textContent = SIDE_NAMES[side];
+      select.append(option);
+    }
+  }
+
   function renderInspector(): void {
     const selected = editor.selection;
     if (!selected) {
@@ -101,6 +121,8 @@ export function setupSidebar(graph: Graph, editor: GraphEditor): void {
       inspectorInfo.textContent = `${degree} ${degree === 1 ? 'edge' : 'edges'} connected`;
       typeField.hidden = false;
       typeSelect.value = node.type;
+      sourceSideField.hidden = true;
+      targetSideField.hidden = true;
       label = node.label;
     } else {
       const edge = graph.getEdge(selected.id);
@@ -111,6 +133,10 @@ export function setupSidebar(graph: Graph, editor: GraphEditor): void {
       labelText.textContent = 'Label';
       inspectorInfo.textContent = `${source} ${graph.directed ? '→' : '—'} ${target}`;
       typeField.hidden = true;
+      sourceSideField.hidden = false;
+      targetSideField.hidden = false;
+      sourceSideSelect.value = edge.sourceSide ?? '';
+      targetSideSelect.value = edge.targetSide ?? '';
       label = edge.label;
     }
     inspectorEmpty.hidden = true;
@@ -174,6 +200,14 @@ export function setupSidebar(graph: Graph, editor: GraphEditor): void {
     const selected = editor.selection;
     if (selected?.kind === 'node' && isNodeType(typeSelect.value)) graph.setNodeType(selected.id, typeSelect.value);
   });
+
+  function setSide(end: 'source' | 'target', value: string): void {
+    const selected = editor.selection;
+    if (selected?.kind !== 'edge') return;
+    graph.setEdgeSide(selected.id, end, isSide(value) ? value : undefined);
+  }
+  sourceSideSelect.addEventListener('change', () => setSide('source', sourceSideSelect.value));
+  targetSideSelect.addEventListener('change', () => setSide('target', targetSideSelect.value));
 
   labelInput.addEventListener('input', () => {
     const selected = editor.selection;
