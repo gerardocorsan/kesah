@@ -9,7 +9,7 @@ For usage and the file map see the [README](../README.md); for working rules see
 ```mermaid
 flowchart LR
   subgraph model["src/model (no DOM)"]
-    graph["graph.ts<br/>document + notifications"]
+    doc["graph.ts<br/>document + notifications"]
     shapes["shapes.ts<br/>geometry of a node"]
     routing["routing.ts<br/>geometry of an edge"]
     layout["layout.ts<br/>sides, fan-out, route points"]
@@ -19,7 +19,7 @@ flowchart LR
   subgraph ui["src/components (SolidJS)"]
     atoms --> molecules --> organisms --> templates
   end
-  graph --> state
+  doc --> state
   layout --> state
   history --> state
   state --> ui
