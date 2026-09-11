@@ -22,8 +22,8 @@
     <div class="workspace">
       <aside class="sidebar" aria-label="Graph tools">
         <section class="panel">
-          <h2>Tools</h2>
-          <button id="btn-add-node" type="button" title="Add a node in the middle of the view">Add node</button>
+          <h2>Add node</h2>
+          <div id="add-node-tools" class="tool-grid"></div>
           <button id="btn-connect" type="button" aria-pressed="false" title="Connect mode: drag from one node to another. Shortcut: hold Shift">Connect</button>
         </section>
         <section class="panel">
@@ -33,6 +33,10 @@
             <label class="field">
               <span id="label-text">Name</span>
               <input id="inp-label" type="text" autocomplete="off" spellcheck="false" />
+            </label>
+            <label class="field" id="type-field">
+              <span>Shape</span>
+              <select id="sel-type"></select>
             </label>
             <p id="inspector-info" class="muted"></p>
             <button id="btn-delete" type="button" class="danger" title="Delete the selected node or edge (Delete key)">Delete</button>

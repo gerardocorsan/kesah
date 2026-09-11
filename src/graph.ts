@@ -1,9 +1,19 @@
 export type NodeId = string;
 export type EdgeId = string;
 
+/** Flowchart symbol drawn for a node. */
+export type NodeType = 'terminal' | 'process' | 'decision' | 'io';
+export const NODE_TYPES: readonly NodeType[] = ['terminal', 'process', 'decision', 'io'];
+export const DEFAULT_NODE_TYPE: NodeType = 'process';
+
+export function isNodeType(value: unknown): value is NodeType {
+  return typeof value === 'string' && (NODE_TYPES as readonly string[]).includes(value);
+}
+
 export interface GraphNode {
   id: NodeId;
   label: string;
+  type: NodeType;
   x: number;
   y: number;
 }
@@ -97,15 +107,22 @@ export class Graph {
     this.emit();
   }
 
-  addNode(x: number, y: number, label?: string): GraphNode {
+  addNode(x: number, y: number, label?: string, type: NodeType = DEFAULT_NODE_TYPE): GraphNode {
     let id: NodeId;
     do {
       id = `n${++this.nodeSeq}`;
     } while (this.nodes.has(id));
-    const node: GraphNode = { id, label: label ?? String(this.nodeSeq), x, y };
+    const node: GraphNode = { id, label: label ?? String(this.nodeSeq), type, x, y };
     this.nodes.set(id, node);
     this.emit();
     return node;
+  }
+
+  setNodeType(id: NodeId, type: NodeType): void {
+    const node = this.nodes.get(id);
+    if (!node || node.type === type) return;
+    node.type = type;
+    this.emit();
   }
 
   moveNode(id: NodeId, x: number, y: number): void {
@@ -198,7 +215,9 @@ export class Graph {
   /**
    * Validates an unknown value (for example imported JSON) and turns it into
    * sanitized GraphData: malformed or duplicated nodes are dropped, as are
-   * edges pointing at missing nodes. Throws if the basic shape is wrong.
+   * edges pointing at missing nodes. A missing or unknown node type becomes
+   * the default one, so files written before types existed still load.
+   * Throws if the basic shape is wrong.
    */
   static parse(value: unknown): GraphData {
     if (!isRecord(value) || !Array.isArray(value.nodes) || !Array.isArray(value.edges)) {
@@ -211,7 +230,13 @@ export class Graph {
       if (!isRecord(raw) || typeof raw.id !== 'string' || nodeIds.has(raw.id)) continue;
       if (!isFiniteNumber(raw.x) || !isFiniteNumber(raw.y)) continue;
       nodeIds.add(raw.id);
-      nodes.push({ id: raw.id, label: typeof raw.label === 'string' ? raw.label : raw.id, x: raw.x, y: raw.y });
+      nodes.push({
+        id: raw.id,
+        label: typeof raw.label === 'string' ? raw.label : raw.id,
+        type: isNodeType(raw.type) ? raw.type : DEFAULT_NODE_TYPE,
+        x: raw.x,
+        y: raw.y,
+      });
     }
 
     const edges: GraphEdge[] = [];

@@ -1,32 +1,56 @@
 import { byId } from './dom';
-import { Graph } from './graph';
-import { GraphEditor, NODE_HEIGHT, NODE_MIN_WIDTH } from './editor';
+import { Graph, NODE_TYPES, isNodeType, type NodeType } from './graph';
+import { GraphEditor } from './editor';
+import { shapePath, shapeSize } from './shapes';
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
 
 interface Point {
   x: number;
   y: number;
 }
 
-/** First spot at or near `start` that does not overlap an existing node. */
-function freeSpot(graph: Graph, start: Point): Point {
+/** Display name and description of each flowchart symbol. */
+const NODE_TYPE_INFO: Record<NodeType, { name: string; title: string }> = {
+  terminal: { name: 'Terminal', title: 'Start or end of the flow' },
+  process: { name: 'Process', title: 'An action or step' },
+  decision: { name: 'Decision', title: 'A question, with one outgoing edge per answer' },
+  io: { name: 'Input / Output', title: 'Data entering or leaving the flow' },
+};
+
+/** Small inline SVG showing the outline of a node type. */
+function shapeIcon(type: NodeType): SVGSVGElement {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('class', 'shape-icon');
+  svg.setAttribute('viewBox', '-16 -10 32 20');
+  svg.setAttribute('aria-hidden', 'true');
+  const path = document.createElementNS(SVG_NS, 'path');
+  path.setAttribute('d', shapePath(type, { width: 28, height: 16 }));
+  svg.append(path);
+  return svg;
+}
+
+/** First spot at or near `start` where a node of the given type does not overlap an existing node. */
+function freeSpot(graph: Graph, start: Point, type: NodeType): Point {
+  const size = shapeSize(type, 0);
   const spot = { ...start };
   for (let i = 0; i < 50; i++) {
     const taken = graph.nodeList.some(
-      (node) => Math.abs(node.x - spot.x) < NODE_MIN_WIDTH + 8 && Math.abs(node.y - spot.y) < NODE_HEIGHT + 8,
+      (node) => Math.abs(node.x - spot.x) < size.width + 8 && Math.abs(node.y - spot.y) < size.height + 8,
     );
     if (!taken) break;
-    spot.x += NODE_MIN_WIDTH / 2;
-    spot.y += NODE_HEIGHT + 16;
+    spot.x += size.width / 2;
+    spot.y += size.height + 16;
   }
   return spot;
 }
 
 /**
- * Left panel: editing tools, the properties of the selected element and the
- * node list. It only talks to the model and to the editor's selection.
+ * Left panel: one "add" button per shape, the properties of the selected
+ * element and the node list. It only talks to the model and to the editor's selection.
  */
 export function setupSidebar(graph: Graph, editor: GraphEditor): void {
-  const btnAddNode = byId<HTMLButtonElement>('btn-add-node');
+  const addNodeTools = byId<HTMLElement>('add-node-tools');
   const btnConnect = byId<HTMLButtonElement>('btn-connect');
   const btnDelete = byId<HTMLButtonElement>('btn-delete');
   const inspectorTitle = byId<HTMLElement>('inspector-title');
@@ -35,9 +59,28 @@ export function setupSidebar(graph: Graph, editor: GraphEditor): void {
   const inspectorInfo = byId<HTMLElement>('inspector-info');
   const labelText = byId<HTMLElement>('label-text');
   const labelInput = byId<HTMLInputElement>('inp-label');
+  const typeField = byId<HTMLElement>('type-field');
+  const typeSelect = byId<HTMLSelectElement>('sel-type');
   const nodeList = byId<HTMLUListElement>('node-list');
   const nodeCount = byId<HTMLElement>('node-count');
   let listSignature = '';
+
+  // The same shapes drive the "add" buttons and the inspector's shape selector.
+  for (const type of NODE_TYPES) {
+    const info = NODE_TYPE_INFO[type];
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'add-node';
+    button.dataset.type = type;
+    button.title = info.title;
+    button.append(shapeIcon(type), document.createTextNode(info.name));
+    addNodeTools.append(button);
+
+    const option = document.createElement('option');
+    option.value = type;
+    option.textContent = info.name;
+    typeSelect.append(option);
+  }
 
   function renderInspector(): void {
     const selected = editor.selection;
@@ -56,6 +99,8 @@ export function setupSidebar(graph: Graph, editor: GraphEditor): void {
       inspectorTitle.textContent = 'Node';
       labelText.textContent = 'Name';
       inspectorInfo.textContent = `${degree} ${degree === 1 ? 'edge' : 'edges'} connected`;
+      typeField.hidden = false;
+      typeSelect.value = node.type;
       label = node.label;
     } else {
       const edge = graph.getEdge(selected.id);
@@ -65,6 +110,7 @@ export function setupSidebar(graph: Graph, editor: GraphEditor): void {
       inspectorTitle.textContent = 'Edge';
       labelText.textContent = 'Label';
       inspectorInfo.textContent = `${source} ${graph.directed ? '→' : '—'} ${target}`;
+      typeField.hidden = true;
       label = edge.label;
     }
     inspectorEmpty.hidden = true;
@@ -76,8 +122,8 @@ export function setupSidebar(graph: Graph, editor: GraphEditor): void {
   function renderList(): void {
     const nodes = graph.nodeList;
     nodeCount.textContent = String(nodes.length);
-    // The list is rebuilt only when nodes appear, disappear or change name, not while dragging.
-    const signature = nodes.map((node) => `${node.id}=${node.label}`).join('\n');
+    // The list is rebuilt only when nodes appear, disappear or change name or shape, not while dragging.
+    const signature = nodes.map((node) => `${node.id}=${node.type}:${node.label}`).join('\n');
     if (signature !== listSignature) {
       listSignature = signature;
       nodeList.replaceChildren(
@@ -86,7 +132,10 @@ export function setupSidebar(graph: Graph, editor: GraphEditor): void {
           const button = document.createElement('button');
           button.type = 'button';
           button.dataset.id = node.id;
-          button.textContent = node.label || node.id;
+          const name = document.createElement('span');
+          name.className = 'node-name';
+          name.textContent = node.label || node.id;
+          button.append(shapeIcon(node.type), name);
           item.append(button);
           return item;
         }),
@@ -104,9 +153,12 @@ export function setupSidebar(graph: Graph, editor: GraphEditor): void {
     labelInput.select();
   }
 
-  btnAddNode.addEventListener('click', () => {
-    const spot = freeSpot(graph, editor.viewCenter());
-    const node = graph.addNode(spot.x, spot.y);
+  addNodeTools.addEventListener('click', (e) => {
+    const button = e.target instanceof Element ? e.target.closest('button') : null;
+    const type = button?.dataset.type;
+    if (!isNodeType(type)) return;
+    const spot = freeSpot(graph, editor.viewCenter(), type);
+    const node = graph.addNode(spot.x, spot.y, undefined, type);
     editor.select({ kind: 'node', id: node.id });
     focusLabel();
   });
@@ -117,6 +169,11 @@ export function setupSidebar(graph: Graph, editor: GraphEditor): void {
   });
 
   btnDelete.addEventListener('click', () => editor.deleteSelection());
+
+  typeSelect.addEventListener('change', () => {
+    const selected = editor.selection;
+    if (selected?.kind === 'node' && isNodeType(typeSelect.value)) graph.setNodeType(selected.id, typeSelect.value);
+  });
 
   labelInput.addEventListener('input', () => {
     const selected = editor.selection;
@@ -139,7 +196,7 @@ export function setupSidebar(graph: Graph, editor: GraphEditor): void {
   inspectorForm.addEventListener('submit', (e) => e.preventDefault());
 
   nodeList.addEventListener('click', (e) => {
-    const button = e.target instanceof HTMLElement ? e.target.closest('button') : null;
+    const button = e.target instanceof Element ? e.target.closest('button') : null;
     const id = button?.dataset.id;
     if (!id) return;
     editor.select({ kind: 'node', id });

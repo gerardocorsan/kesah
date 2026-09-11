@@ -22,17 +22,20 @@ function loadSaved(graph: Graph): boolean {
   }
 }
 
-/** Sample graph so the canvas is not empty on the first visit. */
+/** Sample flowchart so the canvas is not empty on the first visit. */
 function seedExample(graph: Graph): void {
-  const a = graph.addNode(120, 160, 'A');
-  const b = graph.addNode(320, 80, 'B');
-  const c = graph.addNode(320, 240, 'C');
-  const d = graph.addNode(520, 160, 'D');
-  graph.addEdge(a.id, b.id);
-  graph.addEdge(a.id, c.id);
-  graph.addEdge(b.id, c.id);
-  graph.addEdge(b.id, d.id);
-  graph.addEdge(c.id, d.id);
+  const start = graph.addNode(300, 60, 'Start', 'terminal');
+  const read = graph.addNode(300, 150, 'Read input', 'io');
+  const valid = graph.addNode(300, 250, 'Valid?', 'decision');
+  const process = graph.addNode(160, 350, 'Process data', 'process');
+  const error = graph.addNode(440, 350, 'Show error', 'process');
+  const end = graph.addNode(300, 450, 'End', 'terminal');
+  graph.addEdge(start.id, read.id);
+  graph.addEdge(read.id, valid.id);
+  graph.addEdge(valid.id, process.id, 'Yes');
+  graph.addEdge(valid.id, error.id, 'No');
+  graph.addEdge(process.id, end.id);
+  graph.addEdge(error.id, end.id);
 }
 
 const graph = new Graph();

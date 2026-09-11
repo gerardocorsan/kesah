@@ -1,12 +1,8 @@
 import { Graph, type EdgeId, type GraphEdge, type GraphNode, type NodeId } from './graph';
+import { boundaryDistance, shapePath, shapeSize, type Size } from './shapes';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
-/** Node box, in canvas units. The width grows with the label; the height is fixed. */
-export const NODE_HEIGHT = 40;
-export const NODE_MIN_WIDTH = 72;
-const NODE_PADDING_X = 14;
-const NODE_CORNER = 8;
 const MIN_SCALE = 0.2;
 const MAX_SCALE = 4;
 const GRID_SIZE = 24;
@@ -19,11 +15,6 @@ export type Selection = Selected | null;
 interface Point {
   x: number;
   y: number;
-}
-
-interface Size {
-  width: number;
-  height: number;
 }
 
 /** Gesture in progress: what the pointer is doing between pointerdown and pointerup. */
@@ -44,13 +35,6 @@ function createSvg<K extends keyof SVGElementTagNameMap>(
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
-}
-
-/** Distance from the centre of a box to its border along the unit direction (ux, uy). */
-function boundaryDistance(size: Size, ux: number, uy: number): number {
-  const alongX = ux === 0 ? Infinity : size.width / 2 / Math.abs(ux);
-  const alongY = uy === 0 ? Infinity : size.height / 2 / Math.abs(uy);
-  return Math.min(alongX, alongY);
 }
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -460,12 +444,12 @@ export class GraphEditor {
   }
 
   private sizeOf(id: NodeId): Size {
-    return this.nodeSizes.get(id) ?? { width: NODE_MIN_WIDTH, height: NODE_HEIGHT };
+    return this.nodeSizes.get(id) ?? shapeSize(this.graph.getNode(id)?.type ?? 'process', 0);
   }
 
   private createNodeEl(id: NodeId): SVGGElement {
     const group = createSvg('g', { class: 'node', 'data-id': id });
-    group.append(createSvg('rect', { rx: NODE_CORNER, ry: NODE_CORNER }), createSvg('text'));
+    group.append(createSvg('path', { class: 'shape' }), createSvg('text'));
     return group;
   }
 
@@ -473,17 +457,15 @@ export class GraphEditor {
     el.setAttribute('transform', `translate(${node.x} ${node.y})`);
     el.classList.toggle('selected', this.current?.kind === 'node' && this.current.id === node.id);
     const text = el.querySelector('text');
-    const box = el.querySelector('rect');
-    if (!text || !box) return;
-    if (text.textContent === node.label && this.nodeSizes.has(node.id)) return;
-    // Measuring the text forces a layout, so the box is only resized when the label changes.
+    const shape = el.querySelector('path');
+    if (!text || !shape) return;
+    if (text.textContent === node.label && el.dataset.type === node.type && this.nodeSizes.has(node.id)) return;
+    // Measuring the text forces a layout, so the outline is only rebuilt when the label or the type changes.
     text.textContent = node.label;
-    const width = Math.max(NODE_MIN_WIDTH, Math.ceil(text.getComputedTextLength()) + 2 * NODE_PADDING_X);
-    this.nodeSizes.set(node.id, { width, height: NODE_HEIGHT });
-    box.setAttribute('x', String(-width / 2));
-    box.setAttribute('y', String(-NODE_HEIGHT / 2));
-    box.setAttribute('width', String(width));
-    box.setAttribute('height', String(NODE_HEIGHT));
+    el.dataset.type = node.type;
+    const size = shapeSize(node.type, text.getComputedTextLength());
+    this.nodeSizes.set(node.id, size);
+    shape.setAttribute('d', shapePath(node.type, size));
   }
 
   private createEdgeEl(id: EdgeId): SVGGElement {
@@ -500,14 +482,14 @@ export class GraphEditor {
     const selected = this.current?.kind === 'edge' && this.current.id === edge.id;
     el.classList.toggle('selected', selected);
 
-    // The line is trimmed at the border of each box so the arrowhead stays visible.
+    // The line is trimmed at the outline of each shape so the arrowhead stays visible.
     const dx = target.x - source.x;
     const dy = target.y - source.y;
     const length = Math.hypot(dx, dy) || 1;
     const ux = dx / length;
     const uy = dy / length;
-    const startGap = boundaryDistance(this.sizeOf(source.id), ux, uy) + 1;
-    const endGap = boundaryDistance(this.sizeOf(target.id), ux, uy) + 1;
+    const startGap = boundaryDistance(source.type, this.sizeOf(source.id), ux, uy) + 1;
+    const endGap = boundaryDistance(target.type, this.sizeOf(target.id), ux, uy) + 1;
     const x1 = source.x + ux * startGap;
     const y1 = source.y + uy * startGap;
     const x2 = target.x - ux * endGap;
