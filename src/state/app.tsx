@@ -3,6 +3,7 @@ import { createStore, produce } from 'solid-js/store';
 import { Graph, type EdgeId, type EdgeStyle, type GraphEdge, type GraphNode, type NodeId, type NodeType } from '../model/graph';
 import { shapeSize, type Point, type Size } from '../model/shapes';
 import { layoutEdges, type EdgeLayout } from '../model/layout';
+import { History } from '../model/history';
 
 /**
  * Application state: a reactive view over the framework-free `Graph`, plus
@@ -34,8 +35,14 @@ const MAX_SCALE = 4;
 
 export interface AppState {
   readonly graph: Graph;
+  /** Undo/redo history of the graph. Gestures open a transaction on it to group their changes. */
+  readonly history: History;
   /** Bumps on every graph change. Read it inside a computation to re-run when the graph mutates in place. */
   revision: Accessor<number>;
+  canUndo: Accessor<boolean>;
+  canRedo: Accessor<boolean>;
+  undo(): void;
+  redo(): void;
   nodes: Accessor<GraphNode[]>;
   edges: Accessor<GraphEdge[]>;
   directed: Accessor<boolean>;
@@ -83,6 +90,15 @@ function clamp(value: number, min: number, max: number): number {
 export function createAppState(graph: Graph): AppState {
   const [revision, setRevision] = createSignal(0);
   graph.onChange(() => setRevision((v) => v + 1));
+
+  // Created after the graph is loaded or seeded, so the initial document is the baseline.
+  const history = new History(graph);
+  const [historyRevision, setHistoryRevision] = createSignal(0);
+  history.onChange(() => setHistoryRevision((v) => v + 1));
+  const canUndo = createMemo(() => (historyRevision(), history.canUndo));
+  const canRedo = createMemo(() => (historyRevision(), history.canRedo));
+  const undo = (): void => history.undo();
+  const redo = (): void => history.redo();
 
   // The graph mutates its objects in place, so these memos return fresh arrays of the same objects:
   // <For> keeps the DOM of each node and edge, and only what reads a changed field updates.
@@ -235,7 +251,12 @@ export function createAppState(graph: Graph): AppState {
 
   return {
     graph,
+    history,
     revision,
+    canUndo,
+    canRedo,
+    undo,
+    redo,
     nodes,
     edges,
     directed,

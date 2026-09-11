@@ -21,7 +21,7 @@ export function AppLayout() {
       <footer class="hint">
         Double-click the background: new node · Drag a node: move · Drag a side handle (or Shift + drag) from one node to
         another: connect · C: toggle connect mode · Double-click a node or edge: rename · Delete: remove the selection ·
-        Escape: deselect · Wheel: zoom · Drag the background: pan
+        Escape: deselect · Ctrl+Z / Ctrl+Shift+Z: undo / redo · Wheel: zoom · Drag the background: pan
       </footer>
     </>
   );

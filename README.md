@@ -26,6 +26,7 @@ npm run preview  # serve dist/ to test the final version
 | Select | Click a node or an edge, or click a name in the node list of the left panel |
 | Delete | Delete or Backspace key while selected, or "Delete" in the left panel |
 | Deselect | Escape |
+| Undo / redo | Ctrl+Z / Ctrl+Shift+Z (or Ctrl+Y), or the "Undo" and "Redo" buttons. A drag or the typing of a name counts as one step |
 | Zoom | Mouse wheel |
 | Pan canvas | Drag the background, or use the middle mouse button |
 | Directed / undirected | "Directed" checkbox |
@@ -54,6 +55,7 @@ The model is framework-free; the interface is made of Solid components organised
   - `shapes.ts`: geometry of the node shapes. Size for a label, SVG outline, side handle positions and where an edge meets the border.
   - `routing.ts`: automatic side choice, orthogonal routes with elbows, rounded paths, label placement and fan-out of parallel edges.
   - `layout.ts`: resolves the sides and offsets of every edge, computes the points it passes through, and finds a free spot for a new node.
+  - `history.ts`: undo/redo as snapshots of the graph, with transactions that group the changes of a gesture into one step.
 - `src/state/app.tsx`: the application state. A reactive view over the graph (a revision signal bumped on every change) plus selection, modes, camera and the measured node sizes, provided to components through context.
 - `src/components/atoms/`: Button, Checkbox, TextInput, Select, Kbd, ShapeIcon, Muted.
 - `src/components/molecules/`: Field, ToolButton, ShapePicker, NodeListItem, FileButton, and the SVG pieces of the canvas: GridPattern, ArrowMarkers, NodeShape, EdgePath.

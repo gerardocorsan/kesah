@@ -46,6 +46,12 @@ export function Toolbar() {
       <Button id="btn-new" title="Clear the canvas" onClick={newGraph}>
         New
       </Button>
+      <Button id="btn-undo" title="Undo (Ctrl+Z)" disabled={!app.canUndo()} onClick={() => app.undo()}>
+        Undo
+      </Button>
+      <Button id="btn-redo" title="Redo (Ctrl+Shift+Z or Ctrl+Y)" disabled={!app.canRedo()} onClick={() => app.redo()}>
+        Redo
+      </Button>
       <Checkbox
         id="chk-directed"
         label="Directed"

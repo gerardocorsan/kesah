@@ -43,7 +43,10 @@ export function attachGestures(svg: SVGSVGElement, app: AppState): () => void {
   };
 
   const endGesture = (): void => {
+    const ended = gesture;
     gesture = { kind: 'none' };
+    // A drag is one undo step, however many moves it produced.
+    if (ended.kind === 'drag-node') app.history.commit();
     batch(() => {
       app.setConnecting(false);
       app.setPreview(null);
@@ -70,6 +73,7 @@ export function attachGestures(svg: SVGSVGElement, app: AppState): () => void {
         startConnect(node, undefined, point);
       } else {
         gesture = { kind: 'drag-node', id: nodeId, offsetX: point.x - node.x, offsetY: point.y - node.y };
+        app.history.begin();
         // Bring it to the front. Done before capturing: moving the element in the DOM would release the capture.
         app.setFrontNode(nodeId);
       }
@@ -153,6 +157,18 @@ export function attachGestures(svg: SVGSVGElement, app: AppState): () => void {
 
   const onKeyDown = (e: KeyboardEvent): void => {
     if (isTypingTarget(e.target)) return;
+    const modifier = e.ctrlKey || e.metaKey;
+    if (modifier && (e.key === 'z' || e.key === 'Z')) {
+      e.preventDefault();
+      if (e.shiftKey) app.redo();
+      else app.undo();
+      return;
+    }
+    if (modifier && (e.key === 'y' || e.key === 'Y')) {
+      e.preventDefault();
+      app.redo();
+      return;
+    }
     if (e.key === 'Delete' || e.key === 'Backspace') {
       if (!app.selection()) return;
       e.preventDefault();

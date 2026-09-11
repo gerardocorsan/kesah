@@ -86,12 +86,19 @@ export function InspectorPanel() {
             id="inp-label"
             ref={(el) => (input = el)}
             value={shownLabel()}
-            onFocus={() => setDraft(modelLabel())}
+            onFocus={() => {
+              setDraft(modelLabel());
+              // Everything typed until the field loses focus is one undo step.
+              app.history.begin();
+            }}
             onInput={(value) => {
               setDraft(value);
               applyLabel(value);
             }}
-            onBlur={() => setDraft(null)}
+            onBlur={() => {
+              setDraft(null);
+              app.history.commit();
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === 'Escape') {
                 e.preventDefault();
