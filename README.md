@@ -1,12 +1,14 @@
 # Kesah, visual graph editor
 
-A web application for drawing flowcharts and graphs (nodes and edges) using the mouse. Built with TypeScript and [SolidJS](https://www.solidjs.com/), the only runtime dependency: the drawing is plain SVG rendered by Solid components, and Vite is used for development and bundling.
+A web application for drawing flowcharts and graphs (nodes and edges) using the mouse. Built with TypeScript and [SolidJS](https://www.solidjs.com/), the only runtime dependency: the drawing is plain SVG rendered by Solid components, and Vite is used for development and bundling. The document model is framework-free and lives apart from the UI.
+
+Design decisions and invariants are explained in [docs/architecture.md](docs/architecture.md); working rules for contributors and AI assistants are in [AGENTS.md](AGENTS.md).
 
 ## Getting started
 
 ```bash
 npm install
-npm run dev      # development server at http://localhost:5173
+npm run dev      # development server at http://localhost:5173 (./start does the same)
 npm run build    # type-check and generate dist/
 npm run preview  # serve dist/ to test the final version
 ```
@@ -74,6 +76,9 @@ The model is framework-free; the interface is made of Solid components organised
 - `src/components/templates/AppLayout.tsx`: toolbar on top, side panel and canvas in the middle, hint at the bottom.
 - `src/App.tsx` and `src/main.tsx`: root component, persistence in `localStorage` and the sample flowchart.
 - `src/styles/tokens.css`: colour variables and the page reset.
+- `src/test/`: test environment (jsdom stand-ins) and rendering helpers. Tests themselves sit next to the code as `*.test.ts(x)`.
+- `e2e/smoke.mjs`: end-to-end smoke test driving a headless Chrome. `scripts/verify-tests.mjs`: mutation check of the unit tests.
+- `docs/architecture.md`: the decisions behind all of the above.
 
 ## JSON format
 
