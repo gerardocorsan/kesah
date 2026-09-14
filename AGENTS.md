@@ -7,8 +7,12 @@ the [README](README.md).
 ## Layout
 
 - `app/`: the web application (Vite, SolidJS, Vitest). Every npm command runs from there.
-- `server/`: the Rust backend (Cargo workspace), once the execution work starts.
-- `docs/`, `AGENTS.md`, `CLAUDE.md`, `README.md` and `start` stay at the root.
+- `server/`: the Rust backend, a Cargo workspace with the `engine` crate (pure interpreter) and the
+  `api` crate (axum binary). Every cargo command runs from there.
+- `docs/`, `AGENTS.md`, `CLAUDE.md`, `README.md`, `build` and `start` stay at the root.
+- The JSON document (`Graph.toJSON()`) is the contract between the two halves. A new field is added on
+  both sides in the same change: the model and inspector in `app/`, the serde types in
+  `server/crates/engine/src/document.rs`, and the README's JSON section.
 
 ## Language
 
@@ -35,6 +39,12 @@ the [README](README.md).
 - The DOM contract listed in `docs/architecture.md` (ids, classes, `data-*`) is public API for the
   tests; renaming any of it is a breaking change.
 - No comma expressions inside JSX braces; the Vite dependency scanner rejects them.
+- Server crates: axum, tokio, tokio-stream, serde, serde_json and rhai only (tower and
+  http-body-util as dev-dependencies). Add nothing else without an explicit decision by the maintainer.
+- The `engine` crate does no I/O and never reads a clock: time arrives as a `u64` in milliseconds.
+  Anything that needs a socket, a timer or the wall clock belongs in `api`.
+- The API answers 400 for a document it cannot run, 404 for unknown ids and 409 for an action the
+  instance cannot take now; every success returns the full instance state.
 
 ## Tests
 
@@ -48,6 +58,12 @@ the [README](README.md).
   rewritten, not the mutation removed.
 - Loops in tests must be bounded so a broken implementation cannot hang the run.
 - Suspicious behaviour found while testing is reported to the maintainer, not encoded in a test.
+- Rust: engine semantics are tested as scenarios in `server/crates/engine/tests/semantics.rs`
+  (one per documented rule), the API in `server/crates/api/tests/api.rs` through
+  `tower::ServiceExt::oneshot`, never over a real socket. `cargo mutants -p engine` must report no
+  missed mutants; a survivor gets a test, and an equivalent mutant is removed by restructuring the code.
+- `scripts/verify-tests.mjs` rewrites source files while it runs: never build, test or run the
+  app at the same time.
 
 ## Definition of done
 
@@ -59,6 +75,12 @@ npx tsc --noEmit
 npm test                          # coverage threshold 85 % on every metric
 npm run build && npm run test:e2e # needs Chrome (CHROME_BIN)
 node scripts/verify-tests.mjs     # when a unit was added or changed
+
+cd server
+cargo fmt --check
+cargo clippy --all-targets -- -D warnings
+cargo test
+cargo mutants -p engine           # when the engine changed
 ```
 
 Then update the README (controls, JSON, structure) and `docs/architecture.md` if a decision or an
@@ -66,5 +88,7 @@ invariant changed. Report what was verified and what was not.
 
 ## Local conventions
 
-- `./start` at the root runs the dev server on port 5173; do not leave your own dev servers running on it.
+- `./build` at the root builds both halves for production; `./start` runs the API on port 8080 and
+  the dev server on port 5173. Do not leave your own servers running on either port; `KESAH_PORT`
+  gives a throwaway API instance another port.
 - Temporary files go under `tmp/` (ignored), never in `app/src/`.

@@ -3,7 +3,8 @@
 This document explains the decisions and invariants behind Kesah, the things a reader cannot
 recover by skimming the code. It is updated when a decision changes, not when code changes.
 For usage and the file map see the [README](../README.md); for working rules see [AGENTS.md](../AGENTS.md).
-Paths below are relative to `app/`, where the web application lives; the Rust backend will live in `server/`.
+Paths below are relative to `app/`, where the web application lives, unless they start with
+`server/`, the Rust backend. The *Execution* chapter covers the server.
 
 ## Layers
 
@@ -51,6 +52,11 @@ Three rules keep the layers apart:
   type accepts; `setNodeType` keeps a variant the new type accepts and resets it otherwise, and
   `setNodeVariant` ignores anything the type does not accept. An edge has a `kind` (sequence,
   message, association) and a `condition` that only sequence flows keep.
+- Execution properties (`script`, `delay`, `message` on nodes, `expression` on edges) are optional
+  and **absent rather than empty**: the setters delete the field for blank text or an invalid number,
+  `toJSON` writes only what is present, and `parse` copies only valid values. The editor does not know
+  which element uses which property; it only decides which field to show. Leaving the sequence kind
+  drops the expression along with the condition.
 - `Graph.parse` is the only entry for untrusted data. It never throws for a bad node or edge; it drops
   them. It throws only when the value is not an object with `nodes` and `edges` arrays. Missing or
   unknown fields take defaults so old files load and look the same: flowchart types map onto BPMN
@@ -226,14 +232,65 @@ flowchart is created. Export writes the same JSON with a `.json` name; import go
   by unit tests and by the Chrome end-to-end script: `#status`, `#chk-directed`, `#chk-orthogonal`,
   `#btn-new/-undo/-redo/-fit/-export/-connect/-delete`, `#file-import`, `#add-node-tools button[data-type]`,
   `#inspector-form/-empty/-title/-info`, `#inp-label`, `#type-field`, `#sel-type`,
+  `#script-field`, `#inp-script`, `#delay-field`, `#inp-delay`, `#message-field`, `#inp-message`,
+  `#expression-field`, `#inp-expression`,
   `#source-side-field`, `#sel-source-side`, `#target-side-field`, `#sel-target-side`,
   `#node-list button .node-name`, `#node-count`, `.canvas.connect-mode/.connecting`,
   `.node[data-id][data-type] path/text/.port[data-side]`, `.edge[data-id] .edge-hit/.edge-line/.edge-label`,
   `.viewport`, `pattern#grid`, `marker#arrow/#arrow-selected`. Renaming any of them is a breaking change.
 - **jsdom stand-ins.** `src/test/setup.ts` provides text measurement (7 px per character), pointer
-  capture and `elementFromPoint`. These replace the environment, never the unit under test.
+  capture, `elementFromPoint` and a `scrollIntoView` that dispatches a `scroll-into-view` event. These replace the environment, never the unit under test.
 - **Mutation check.** `scripts/verify-tests.mjs` breaks each unit in a known way and expects its tests
   to fail. A new unit gets a new entry there.
+
+## Execution (`server/`)
+
+```mermaid
+flowchart LR
+  editor["app (browser)"] -- "JSON document, REST, SSE" --> api["api crate<br/>axum routes, store, scheduler"]
+  api -- "Process, Instance, now (ms)" --> engine["engine crate<br/>document, instance, scripting"]
+  engine -- "scripts, expressions" --> rhai["rhai"]
+```
+
+- **The JSON document is the border.** The server deserialises exactly what `Graph.toJSON()` writes,
+  with serde defaults for the optional fields, and validates it into a `Process` (unique ids, known
+  variants, flows between existing distinct nodes, at least one start event). It does not apply the
+  editor's legacy mapping: the app normalises before sending. Drawing data (`x`, `y`, sides, labels)
+  travels along and is ignored, except that labels name elements in messages.
+- **Engine and API are separate crates because time and I/O are.** `engine` is a pure library:
+  `Instance::start`, `run`, `tick`, `send_message`, `complete_task` and `stop` all take `now` in
+  milliseconds. Tests drive timers by handing in a later `now`; the API hands in the wall clock. This
+  is also what makes `cargo mutants` practical: every scenario runs in milliseconds with no sockets.
+- **Tokens, not a call stack.** An instance is a list of tokens, each on a node, each either
+  runnable or waiting (`timer`, `message`, `user-task`, `join`). `run` steps the first runnable token
+  until none is left: the instance is *finished* when no token remains and *waiting* otherwise.
+  Variables are one JSON object shared by every token; there is no per-branch scope. `trail` records
+  the ids of the nodes and flows visited so a client can highlight the path.
+- **Joins count arrivals by incoming flow.** A gateway with more than one incoming sequence flow is a
+  join (`Process::is_join`), except an exclusive gateway, which merges without waiting. A parallel
+  join fires when a token has arrived through every incoming flow; an inclusive join also fires when
+  no token is alive anywhere else, the practical approximation of "no token can still reach me". A
+  branch that ends before a parallel join leaves the instance waiting forever; this is the BPMN
+  meaning, and `stop` is the way out.
+- **Waits are resumed by flags, not by re-dispatch.** A token released from a wait is marked
+  `resumed`, so the node continues instead of waiting again. The flag never leaves the engine.
+- **Scripts cannot stall the server.** Each evaluation gets a fresh Rhai engine with operation, call
+  depth, expression depth and size limits; a runaway script is a failed instance. `vars` is pushed
+  into the scope as a map and read back afterwards, so scripts can add, change or delete variables,
+  and `log(value)` appends to the instance log. A `run` is also bounded by `MAX_STEPS` so a cycle
+  without exit fails instead of looping.
+- **The API is a mutex around the store.** Processes and instances live in memory in one `Store`;
+  every request locks it, acts, and publishes the new state on a broadcast channel. The scheduler
+  task ticks every 100 ms, releases due timers and publishes the same way. The SSE endpoint sends the
+  current state first and then every event for that instance, with keep-alives. Ids are a prefix,
+  the time and a counter: unique per server run, no random source needed.
+- **The console is a diff of the state.** `Running` remembers how much of the trail, the log and
+  the status it has reported; after every action and every scheduler tick it prints only what is new,
+  so a step is never written twice and the report needs no hooks inside the engine. Plain `println!`
+  on purpose: no logging crate, and the format is tested through `Running::drain_report`.
+- **Errors carry the element.** Validation errors name the node or edge; runtime failures put the
+  node id on the log entry and a message with the element's label in `error`. HTTP maps them to 400
+  (document), 404 (ids) and 409 (an action the instance cannot take now).
 
 ## Known limitations
 
@@ -251,6 +308,9 @@ flowchart is created. Export writes the same JSON with a `.json` name; import go
 - Undo/redo shortcuts are not blocked during a gesture; using them mid-drag is unspecified.
 - One document at a time; no multi-selection, no copy/paste, no touch-specific gestures beyond what
   pointer events give for free.
+- The server keeps nothing across restarts and runs one request at a time; there is no
+  authentication, no versioning of deployed processes, no message flows between instances, and no
+  run panel in the editor yet.
 
 ## Extension points
 
@@ -264,3 +324,7 @@ flowchart is created. Export writes the same JSON with a `.json` name; import go
   old files, then to the inspector; keep the JSON backwards compatible.
 - **Another renderer**: the model and `layoutEdges`/`routeOf` need only a size lookup; everything under
   `components/` is replaceable.
+- **A new execution rule**: add the behaviour to `Instance::step_*` in `server/crates/engine/src/instance.rs`,
+  a scenario in `tests/semantics.rs`, and a row in the README's *Running processes* table.
+- **Persistence for the server**: `Store` is the only place that holds processes and instances;
+  replace it behind `AppState` and keep `engine` untouched.
