@@ -1,25 +1,77 @@
-/* Canvas drawing: grid, nodes, side handles, edges and arrowheads. */
+/* Canvas drawing: grid, nodes, side handles, edges and markers. */
 
 .grid-dot {
   fill: var(--grid);
 }
 
-/* Nodes */
+/* Nodes: a filled outline, optional decorations and glyph, and the label */
 
 .node {
   cursor: grab;
 }
 
-.node path {
+.node path.shape {
   fill: #fff;
   stroke: var(--accent);
   stroke-width: 2;
   stroke-linejoin: round;
 }
 
-.node.selected path {
+.node[data-type="end-event"] path.shape {
+  stroke-width: 4;
+}
+
+/* The annotation's body is only a click target; its visible part is the bracket decoration. */
+.node[data-type="annotation"] path.shape {
+  stroke: none;
+}
+
+.node path.decoration {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.node path.decoration.marker {
+  stroke-width: 1.5;
+}
+
+.node path.decoration.disc {
+  fill: var(--accent);
+  stroke: none;
+}
+
+.node path.glyph {
+  fill: none;
+  stroke: var(--text);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.node.selected path.shape,
+.node.selected path.decoration {
   stroke: var(--select);
+}
+
+.node.selected path.shape {
   stroke-width: 3;
+}
+
+.node.selected[data-type="end-event"] path.shape {
+  stroke-width: 5;
+}
+
+.node.selected[data-type="annotation"] path.shape {
+  stroke: none;
+}
+
+.node.selected path.decoration.disc {
+  fill: var(--select);
+  stroke: none;
 }
 
 .node text {
@@ -29,6 +81,19 @@
   dominant-baseline: central;
   fill: var(--text);
   pointer-events: none;
+}
+
+/* Labels under fixed symbols may sit on a connection leaving through the bottom: a halo keeps them readable. */
+.node text.label-below {
+  font-size: 12px;
+  font-weight: 400;
+  paint-order: stroke;
+  stroke: var(--bg);
+  stroke-width: 4px;
+}
+
+.node text.align-start {
+  text-anchor: start;
 }
 
 /* Side handles: hidden until the node is hovered or selected, or while an edge is being dragged. */
@@ -72,6 +137,15 @@
   pointer-events: none;
 }
 
+.edge-message .edge-line {
+  stroke-dasharray: 8 5;
+}
+
+.edge-association .edge-line {
+  stroke-dasharray: 2 4;
+  stroke-linecap: round;
+}
+
 .edge.selected .edge-line {
   stroke: var(--select);
   stroke-width: 3;
@@ -88,12 +162,35 @@
   pointer-events: none;
 }
 
+/* Markers */
+
 .arrow-head {
   fill: var(--edge);
 }
 
+.arrow-open,
+.flow-mark {
+  fill: none;
+  stroke: var(--edge);
+  stroke-width: 2;
+}
+
+.flow-diamond,
+.message-dot {
+  fill: #fff;
+  stroke: var(--edge);
+  stroke-width: 1.5;
+}
+
 .arrow-head.selected {
   fill: var(--select);
+}
+
+.arrow-open.selected,
+.flow-mark.selected,
+.flow-diamond.selected,
+.message-dot.selected {
+  stroke: var(--select);
 }
 
 .edge-preview {

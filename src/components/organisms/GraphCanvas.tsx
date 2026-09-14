@@ -49,7 +49,7 @@ export function GraphCanvas() {
                 y1={line().y1}
                 x2={line().x2}
                 y2={line().y2}
-                marker-end={app.directed() ? 'url(#arrow)' : undefined}
+                marker-end="url(#arrow)"
               />
             )}
           </Show>

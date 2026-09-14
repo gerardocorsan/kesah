@@ -1,6 +1,6 @@
 import type { NodeType, Side } from './graph';
 
-/** Pure geometry of the flowchart symbols. No DOM here: the editor turns these into SVG. */
+/** Pure geometry of the BPMN symbols. No DOM here: the view turns these into SVG. */
 
 export interface Point {
   x: number;
@@ -12,32 +12,68 @@ export interface Size {
   height: number;
 }
 
+const EVENT_DIAMETER = 36;
+const TASK_MIN_WIDTH = 100;
+const TASK_HEIGHT = 60;
+const TASK_CORNER = 10;
+const GATEWAY_SIZE = 50;
+const ANNOTATION_HEIGHT = 40;
+const DATA_OBJECT_SIZE: Size = { width: 36, height: 48 };
+const LABEL_PADDING = 24;
+const FOLD = 8;
+const BRACKET_ARM = 12;
+const MARKER_SIZE = 12;
+
+/** Distance between the bottom of a shape and the centre line of a label drawn below it. */
+export const LABEL_BELOW_GAP = 14;
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-const HEIGHT = 40;
-const DECISION_HEIGHT = 56;
-const CORNER = 8;
+type Geometry = 'circle' | 'rect' | 'rhombus';
 
-/** Horizontal offset of the slanted sides of the input/output parallelogram. */
-function ioSkew(height: number): number {
-  return Math.round(height * 0.3);
+function geometryOf(type: NodeType): Geometry {
+  switch (type) {
+    case 'start-event':
+    case 'intermediate-event':
+    case 'end-event':
+      return 'circle';
+    case 'gateway':
+      return 'rhombus';
+    default:
+      return 'rect';
+  }
 }
 
-/** Box needed by a node of the given type to fit a label of the given width, in canvas units. */
+/** Whether the box of the shape widens to fit its label (otherwise the label is drawn below a fixed box). */
+export function growsWithLabel(type: NodeType): boolean {
+  return type === 'task' || type === 'subprocess' || type === 'annotation';
+}
+
+export type LabelPlacement = 'inside' | 'below';
+
+export function labelPlacement(type: NodeType): LabelPlacement {
+  return growsWithLabel(type) ? 'inside' : 'below';
+}
+
+/** Box of a node of the given type for a label of the given width, in canvas units. */
 export function shapeSize(type: NodeType, textWidth: number): Size {
   const text = Math.ceil(textWidth);
   switch (type) {
-    case 'terminal':
-      return { width: Math.max(80, text + 40), height: HEIGHT };
-    case 'decision':
-      // A rhombus needs roughly 1.6 times the text width for the label to fit inside it.
-      return { width: Math.max(96, Math.ceil(text * 1.6) + 24), height: DECISION_HEIGHT };
-    case 'io':
-      return { width: Math.max(88, text + 28 + 2 * ioSkew(HEIGHT)), height: HEIGHT };
-    case 'process':
-      return { width: Math.max(72, text + 28), height: HEIGHT };
+    case 'start-event':
+    case 'intermediate-event':
+    case 'end-event':
+      return { width: EVENT_DIAMETER, height: EVENT_DIAMETER };
+    case 'task':
+    case 'subprocess':
+      return { width: Math.max(TASK_MIN_WIDTH, text + LABEL_PADDING), height: TASK_HEIGHT };
+    case 'gateway':
+      return { width: GATEWAY_SIZE, height: GATEWAY_SIZE };
+    case 'annotation':
+      return { width: Math.max(TASK_MIN_WIDTH, text + LABEL_PADDING), height: ANNOTATION_HEIGHT };
+    case 'data-object':
+      return { ...DATA_OBJECT_SIZE };
   }
 }
 
@@ -59,48 +95,67 @@ function roundedRectPath(size: Size, radius: number): string {
   ].join(' ');
 }
 
-/** SVG path data for the outline of a node of the given type, centred on the origin. */
+function circlePath(radius: number): string {
+  return `M 0 ${-radius} A ${radius} ${radius} 0 1 1 0 ${radius} A ${radius} ${radius} 0 1 1 0 ${-radius} Z`;
+}
+
+/**
+ * SVG path data for the outline of a node, centred on the origin. This is the
+ * filled, clickable body; the annotation's visible bracket and other details
+ * come from `decorations`.
+ */
 export function shapePath(type: NodeType, size: Size): string {
   const w = size.width / 2;
   const h = size.height / 2;
   switch (type) {
-    case 'terminal':
-      return roundedRectPath(size, h);
-    case 'decision':
+    case 'start-event':
+    case 'intermediate-event':
+    case 'end-event':
+      return circlePath(h);
+    case 'task':
+    case 'subprocess':
+      return roundedRectPath(size, Math.min(TASK_CORNER, h / 2));
+    case 'gateway':
       return `M 0 ${-h} L ${w} 0 L 0 ${h} L ${-w} 0 Z`;
-    case 'io': {
-      const skew = ioSkew(size.height);
-      return `M ${-w + skew} ${-h} L ${w} ${-h} L ${w - skew} ${h} L ${-w} ${h} Z`;
-    }
-    case 'process':
-      return roundedRectPath(size, Math.min(CORNER, size.height / 4));
+    case 'annotation':
+      return `M ${-w} ${-h} H ${w} V ${h} H ${-w} Z`;
+    case 'data-object':
+      return `M ${-w} ${-h} H ${w - FOLD} L ${w} ${-h + FOLD} V ${h} H ${-w} Z`;
   }
 }
 
-/** Distance from the centre of a rectangle to its border along the unit direction (ux, uy). */
-function rectDistance(size: Size, ux: number, uy: number): number {
-  const alongX = ux === 0 ? Infinity : size.width / 2 / Math.abs(ux);
-  const alongY = uy === 0 ? Infinity : size.height / 2 / Math.abs(uy);
-  return Math.min(alongX, alongY);
+export interface Decoration {
+  /** What the stroke is for; the view styles each role differently. */
+  role: 'inner' | 'disc' | 'marker' | 'bracket' | 'fold';
+  d: string;
 }
 
-/** Distance from the centre of a pill (rectangle with semicircular ends) to its border. */
-function pillDistance(size: Size, ux: number, uy: number): number {
-  const r = size.height / 2;
-  const s = Math.max(0, size.width / 2 - r); // half-length of the straight part
-  const ax = Math.abs(ux);
-  const ay = Math.abs(uy);
-  // The ray leaves through the flat top or bottom if it gets there before the straight part ends.
-  if (ay > 0 && (r / ay) * ax <= s) return r / ay;
-  // Otherwise it leaves through an end cap: a circle of radius r centred at (±s, 0).
-  return s * ax + Math.sqrt(Math.max(0, r * r - s * s * ay * ay));
-}
-
-/** Distance from the centre of a rhombus with half-diagonals (a, b) to its border. */
-function rhombusDistance(size: Size, ux: number, uy: number): number {
-  const a = size.width / 2;
-  const b = size.height / 2;
-  return 1 / (Math.abs(ux) / a + Math.abs(uy) / b);
+/** Extra strokes drawn over the outline: inner circle, terminate disc, sub-process marker, annotation bracket, folded corner. */
+export function decorations(type: NodeType, variant: string, size: Size): Decoration[] {
+  const w = size.width / 2;
+  const h = size.height / 2;
+  switch (type) {
+    case 'intermediate-event':
+      return [{ role: 'inner', d: circlePath(h - 3) }];
+    case 'end-event':
+      return variant === 'terminate' ? [{ role: 'disc', d: circlePath(h - 6) }] : [];
+    case 'subprocess': {
+      const top = h - MARKER_SIZE - 2;
+      const half = MARKER_SIZE / 2;
+      return [
+        {
+          role: 'marker',
+          d: `M ${-half} ${top} H ${half} V ${top + MARKER_SIZE} H ${-half} Z M 0 ${top + 2} V ${top + MARKER_SIZE - 2} M ${-half + 2} ${top + half} H ${half - 2}`,
+        },
+      ];
+    }
+    case 'annotation':
+      return [{ role: 'bracket', d: `M ${-w + BRACKET_ARM} ${-h} H ${-w} V ${h} H ${-w + BRACKET_ARM}` }];
+    case 'data-object':
+      return [{ role: 'fold', d: `M ${w - FOLD} ${-h} V ${-h + FOLD} H ${w}` }];
+    default:
+      return [];
+  }
 }
 
 /** Outward unit vector of a side. */
@@ -123,23 +178,14 @@ function outlineExtent(type: NodeType, size: Size, side: Side, offset: number): 
   const h = size.height / 2;
   const vertical = side === 'top' || side === 'bottom';
   const o = Math.abs(offset);
-  switch (type) {
-    case 'decision':
+  switch (geometryOf(type)) {
+    case 'rhombus':
       return vertical ? h * (1 - o / w) : w * (1 - o / h);
-    case 'terminal': {
-      const r = h;
-      const s = Math.max(0, w - r);
-      if (vertical) return o <= s ? r : Math.sqrt(Math.max(0, r * r - (o - s) ** 2));
-      return s + Math.sqrt(Math.max(0, r * r - o * o));
+    case 'circle': {
+      const r = Math.min(w, h);
+      return Math.sqrt(Math.max(0, r * r - o * o));
     }
-    case 'io': {
-      if (vertical) return h;
-      // The right side runs from (w, -h) to (w - skew, h); the left one from (-w + skew, -h) to (-w, h).
-      const t = (offset + h) / size.height; // 0 at the top, 1 at the bottom
-      const skew = ioSkew(size.height);
-      return side === 'right' ? w - skew * t : w - skew * (1 - t);
-    }
-    case 'process':
+    case 'rect':
       return vertical ? h : w;
   }
 }
@@ -166,18 +212,31 @@ export function pointOnSide(type: NodeType, size: Size, side: Side, offset = 0):
   }
 }
 
+/** Distance from the centre of a rectangle to its border along the unit direction (ux, uy). */
+function rectDistance(size: Size, ux: number, uy: number): number {
+  const alongX = ux === 0 ? Infinity : size.width / 2 / Math.abs(ux);
+  const alongY = uy === 0 ? Infinity : size.height / 2 / Math.abs(uy);
+  return Math.min(alongX, alongY);
+}
+
+/** Distance from the centre of a rhombus with half-diagonals (a, b) to its border. */
+function rhombusDistance(size: Size, ux: number, uy: number): number {
+  const a = size.width / 2;
+  const b = size.height / 2;
+  return 1 / (Math.abs(ux) / a + Math.abs(uy) / b);
+}
+
 /**
  * Distance from the centre of a node to its outline along the unit direction (ux, uy).
- * Exact for every shape except the parallelogram, which is treated as its bounding box.
+ * Exact for circles and rhombi; the other symbols are treated as their bounding box.
  */
 export function boundaryDistance(type: NodeType, size: Size, ux: number, uy: number): number {
-  switch (type) {
-    case 'terminal':
-      return pillDistance(size, ux, uy);
-    case 'decision':
+  switch (geometryOf(type)) {
+    case 'circle':
+      return Math.min(size.width, size.height) / 2;
+    case 'rhombus':
       return rhombusDistance(size, ux, uy);
-    case 'io':
-    case 'process':
+    case 'rect':
       return rectDistance(size, ux, uy);
   }
 }

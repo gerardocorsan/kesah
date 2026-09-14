@@ -92,7 +92,7 @@ describe('layoutEdges', () => {
 
 describe('anchorOf', () => {
   it('is the handle point moved one unit out of the outline', () => {
-    const node: GraphNode = { id: 'n1', label: 'A', type: 'process', x: 100, y: 50 };
+    const node: GraphNode = { id: 'n1', label: 'A', type: 'task', variant: 'none', x: 100, y: 50 };
     expect(anchorOf(node, 'top', 0, { width: 72, height: 40 })).toEqual({ x: 100, y: 29, side: 'top' });
     expect(anchorOf(node, 'right', 5, { width: 72, height: 40 })).toEqual({ x: 137, y: 55, side: 'right' });
   });
@@ -106,8 +106,8 @@ describe('routeOf', () => {
     line(graph, a, b);
     const [layout] = layoutEdges(graph.nodeList, graph.edgeList);
     expect(xy(routeOf(layout, 'straight', defaultSize))).toEqual([
-      { x: 37, y: 0 },
-      { x: 163, y: 0 },
+      { x: 51, y: 0 },
+      { x: 149, y: 0 },
     ]);
   });
 
@@ -118,8 +118,8 @@ describe('routeOf', () => {
     line(graph, a, b, { sourceSide: 'top' });
     const [layout] = layoutEdges(graph.nodeList, graph.edgeList);
     const [start, end] = xy(routeOf(layout, 'straight', defaultSize));
-    expect(start).toEqual({ x: 0, y: -21 });
-    expect(end.x).toBeLessThan(200 - 36);
+    expect(start).toEqual({ x: 0, y: -31 });
+    expect(end.x).toBeLessThan(200 - 50);
     expect(end.x).toBeGreaterThan(100);
   });
 
@@ -142,8 +142,8 @@ describe('routeOf', () => {
     line(graph, a, b);
     const [layout] = layoutEdges(graph.nodeList, graph.edgeList);
     expect(xy(routeOf(layout, 'orthogonal', defaultSize))).toEqual([
-      { x: 37, y: 0 },
-      { x: 163, y: 0 },
+      { x: 51, y: 0 },
+      { x: 149, y: 0 },
     ]);
   });
 
@@ -154,24 +154,24 @@ describe('routeOf', () => {
     line(graph, a, b, { sourceSide: 'bottom', targetSide: 'left' });
     const [layout] = layoutEdges(graph.nodeList, graph.edgeList);
     expect(xy(routeOf(layout, 'orthogonal', defaultSize))).toEqual([
-      { x: 0, y: 21 },
+      { x: 0, y: 31 },
       { x: 0, y: 200 },
-      { x: 163, y: 200 },
+      { x: 149, y: 200 },
     ]);
   });
 });
 
 describe('freeSpot', () => {
   it('returns the start when nothing is there', () => {
-    expect(freeSpot([], { x: 10, y: 20 }, 'process')).toEqual({ x: 10, y: 20 });
+    expect(freeSpot([], { x: 10, y: 20 }, 'task')).toEqual({ x: 10, y: 20 });
   });
 
   it('moves away from an occupied start and never overlaps existing nodes', () => {
     const nodes: GraphNode[] = [
-      { id: 'n1', label: 'A', type: 'process', x: 100, y: 100 },
-      { id: 'n2', label: 'B', type: 'decision', x: 140, y: 160 },
+      { id: 'n1', label: 'A', type: 'task', variant: 'none', x: 100, y: 100 },
+      { id: 'n2', label: 'B', type: 'gateway', variant: 'exclusive', x: 140, y: 160 },
     ];
-    for (const type of ['process', 'decision', 'terminal', 'io'] as const) {
+    for (const type of ['task', 'gateway', 'start-event', 'data-object'] as const) {
       const spot = freeSpot(nodes, { x: 100, y: 100 }, type);
       const { width, height } = shapeSize(type, 0);
       expect(spot).not.toEqual({ x: 100, y: 100 });
@@ -183,7 +183,7 @@ describe('freeSpot', () => {
   });
 
   it('is deterministic', () => {
-    const nodes: GraphNode[] = [{ id: 'n1', label: 'A', type: 'process', x: 0, y: 0 }];
-    expect(freeSpot(nodes, { x: 0, y: 0 }, 'io')).toEqual(freeSpot(nodes, { x: 0, y: 0 }, 'io'));
+    const nodes: GraphNode[] = [{ id: 'n1', label: 'A', type: 'task', variant: 'none', x: 0, y: 0 }];
+    expect(freeSpot(nodes, { x: 0, y: 0 }, 'data-object')).toEqual(freeSpot(nodes, { x: 0, y: 0 }, 'data-object'));
   });
 });

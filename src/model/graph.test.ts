@@ -1,7 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_NODE_TYPE, Graph, isNodeType, isSide, NODE_TYPES, SIDES } from './graph';
+import {
+  DEFAULT_NODE_TYPE,
+  EDGE_KINDS,
+  FLOW_CONDITIONS,
+  Graph,
+  NODE_TYPES,
+  NODE_VARIANTS,
+  SIDES,
+  defaultVariant,
+  isEdgeKind,
+  isFlowCondition,
+  isNodeType,
+  isSide,
+  isVariantOf,
+  resolveNodeType,
+} from './graph';
 
-/** Expectations come from the README (JSON format, defaults for old files) and the agreed behaviour. */
+/** Expectations come from the README (elements, JSON format, defaults for old files) and the agreed behaviour. */
 
 function twoNodes(): { graph: Graph; a: string; b: string } {
   const graph = new Graph();
@@ -21,46 +36,113 @@ describe('Graph defaults', () => {
     expect(graph.edgeStyle).toBe('orthogonal');
   });
 
-  it('exposes the four node types and the four sides with their guards', () => {
-    expect(NODE_TYPES).toEqual(['terminal', 'process', 'decision', 'io']);
-    expect(SIDES).toEqual(['top', 'right', 'bottom', 'left']);
-    expect(DEFAULT_NODE_TYPE).toBe('process');
-    expect(isNodeType('decision')).toBe(true);
-    expect(isNodeType('circle')).toBe(false);
+  it('exposes the BPMN element types in palette order, with a task as the default', () => {
+    expect(NODE_TYPES).toEqual(['start-event', 'intermediate-event', 'end-event', 'task', 'subprocess', 'gateway', 'annotation', 'data-object']);
+    expect(DEFAULT_NODE_TYPE).toBe('task');
+    expect(isNodeType('gateway')).toBe(true);
+    expect(isNodeType('decision')).toBe(false);
     expect(isNodeType(undefined)).toBe(false);
+  });
+
+  it('lists the variants of each type: event triggers, task types, gateway kinds', () => {
+    expect(NODE_VARIANTS['start-event']).toEqual(['none', 'message', 'timer']);
+    expect(NODE_VARIANTS['intermediate-event']).toEqual(['none', 'message', 'timer']);
+    expect(NODE_VARIANTS['end-event']).toEqual(['none', 'message', 'terminate']);
+    expect(NODE_VARIANTS.task).toEqual(['none', 'user', 'service', 'script']);
+    expect(NODE_VARIANTS.gateway).toEqual(['exclusive', 'parallel', 'inclusive']);
+    expect(NODE_VARIANTS.subprocess).toEqual([]);
+    expect(NODE_VARIANTS.annotation).toEqual([]);
+    expect(NODE_VARIANTS['data-object']).toEqual([]);
+    expect(defaultVariant('task')).toBe('none');
+    expect(defaultVariant('gateway')).toBe('exclusive');
+    expect(defaultVariant('annotation')).toBe('none');
+    expect(isVariantOf('task', 'user')).toBe(true);
+    expect(isVariantOf('task', 'timer')).toBe(false);
+    expect(isVariantOf('annotation', 'none')).toBe(true);
+    expect(isVariantOf('annotation', 'user')).toBe(false);
+    expect(isVariantOf('gateway', 7)).toBe(false);
+  });
+
+  it('exposes sides, edge kinds and flow conditions with their guards', () => {
+    expect(SIDES).toEqual(['top', 'right', 'bottom', 'left']);
     expect(isSide('left')).toBe(true);
     expect(isSide('middle')).toBe(false);
-    expect(isSide(3)).toBe(false);
+    expect(EDGE_KINDS).toEqual(['sequence', 'message', 'association']);
+    expect(isEdgeKind('message')).toBe(true);
+    expect(isEdgeKind('flow')).toBe(false);
+    expect(FLOW_CONDITIONS).toEqual(['none', 'default', 'conditional']);
+    expect(isFlowCondition('default')).toBe(true);
+    expect(isFlowCondition('maybe')).toBe(false);
+  });
+
+  it('maps the old flowchart types onto BPMN elements and unknown types onto a task', () => {
+    expect(resolveNodeType('terminal')).toBe('start-event');
+    expect(resolveNodeType('process')).toBe('task');
+    expect(resolveNodeType('decision')).toBe('gateway');
+    expect(resolveNodeType('io')).toBe('data-object');
+    expect(resolveNodeType('gateway')).toBe('gateway');
+    expect(resolveNodeType('hexagon')).toBe('task');
+    expect(resolveNodeType(undefined)).toBe('task');
+    expect(resolveNodeType('toString')).toBe('task');
   });
 });
 
 describe('nodes', () => {
-  it('numbers ids n1, n2, … and uses the given label, type and position', () => {
+  it('numbers ids n1, n2, … and stores label, type, variant and position', () => {
     const graph = new Graph();
-    const first = graph.addNode(10, 20, 'Start', 'terminal');
-    const second = graph.addNode(30, 40, 'Check', 'decision');
-    expect(first).toEqual({ id: 'n1', label: 'Start', type: 'terminal', x: 10, y: 20 });
-    expect(second).toEqual({ id: 'n2', label: 'Check', type: 'decision', x: 30, y: 40 });
+    const first = graph.addNode(10, 20, 'Start', 'start-event', 'message');
+    const second = graph.addNode(30, 40, 'Check', 'gateway');
+    expect(first).toEqual({ id: 'n1', label: 'Start', type: 'start-event', variant: 'message', x: 10, y: 20 });
+    expect(second).toEqual({ id: 'n2', label: 'Check', type: 'gateway', variant: 'exclusive', x: 30, y: 40 });
     expect(graph.nodeCount).toBe(2);
     expect(graph.getNode('n2')).toEqual(second);
   });
 
-  it('defaults to a process node with a non-empty label that differs from the previous default', () => {
+  it('defaults to a plain task with a non-empty label that differs from the previous default', () => {
     const graph = new Graph();
     const first = graph.addNode(0, 0);
     const second = graph.addNode(1, 1);
-    expect(first.type).toBe('process');
+    expect(first.type).toBe('task');
+    expect(first.variant).toBe('none');
     expect(first.label).not.toBe('');
     expect(second.label).not.toBe(first.label);
   });
 
-  it('moves, renames and retypes a node in place', () => {
+  it('falls back to the default variant when the given one does not belong to the type', () => {
+    const graph = new Graph();
+    expect(graph.addNode(0, 0, 'A', 'task', 'timer').variant).toBe('none');
+    expect(graph.addNode(0, 0, 'B', 'gateway', 'user').variant).toBe('exclusive');
+    expect(graph.addNode(0, 0, 'C', 'subprocess', 'user').variant).toBe('none');
+  });
+
+  it('moves, renames, retypes and re-variants a node in place', () => {
     const graph = new Graph();
     const node = graph.addNode(0, 0, 'A');
     graph.moveNode(node.id, 50, 60);
     graph.setNodeLabel(node.id, 'Renamed');
-    graph.setNodeType(node.id, 'io');
-    expect(graph.getNode(node.id)).toEqual({ id: 'n1', label: 'Renamed', type: 'io', x: 50, y: 60 });
+    graph.setNodeType(node.id, 'data-object');
+    expect(graph.getNode(node.id)).toEqual({ id: 'n1', label: 'Renamed', type: 'data-object', variant: 'none', x: 50, y: 60 });
+    graph.setNodeType(node.id, 'task');
+    graph.setNodeVariant(node.id, 'service');
+    expect(graph.getNode(node.id)).toMatchObject({ type: 'task', variant: 'service' });
+  });
+
+  it('keeps the variant across a type change when the new type accepts it, and resets it otherwise', () => {
+    const graph = new Graph();
+    const event = graph.addNode(0, 0, 'E', 'start-event', 'message');
+    graph.setNodeType(event.id, 'intermediate-event');
+    expect(graph.getNode(event.id)?.variant).toBe('message');
+    graph.setNodeType(event.id, 'gateway');
+    expect(graph.getNode(event.id)?.variant).toBe('exclusive');
+    graph.setNodeType(event.id, 'annotation');
+    expect(graph.getNode(event.id)?.variant).toBe('none');
+  });
+
+  it('ignores a variant the type does not accept', () => {
+    const graph = new Graph();
+    const task = graph.addNode(0, 0, 'T', 'task', 'user');
+    graph.setNodeVariant(task.id, 'timer');
+    expect(graph.getNode(task.id)?.variant).toBe('user');
   });
 
   it('ignores updates to unknown ids', () => {
@@ -68,9 +150,10 @@ describe('nodes', () => {
     graph.addNode(0, 0, 'A');
     graph.moveNode('n9', 1, 1);
     graph.setNodeLabel('n9', 'x');
-    graph.setNodeType('n9', 'io');
+    graph.setNodeType('n9', 'gateway');
+    graph.setNodeVariant('n9', 'user');
     graph.removeNode('n9');
-    expect(graph.nodeList).toEqual([{ id: 'n1', label: 'A', type: 'process', x: 0, y: 0 }]);
+    expect(graph.nodeList).toEqual([{ id: 'n1', label: 'A', type: 'task', variant: 'none', x: 0, y: 0 }]);
   });
 
   it('removing a node also removes every edge touching it', () => {
@@ -90,12 +173,19 @@ describe('nodes', () => {
 });
 
 describe('edges', () => {
-  it('numbers ids e1, e2, … and stores source, target and label', () => {
+  it('numbers ids e1, e2, … and creates sequence flows without a condition by default', () => {
     const { graph, a, b } = twoNodes();
     const edge = graph.addEdge(a, b, 'Yes');
-    expect(edge).toEqual({ id: 'e1', source: a, target: b, label: 'Yes' });
+    expect(edge).toEqual({ id: 'e1', source: a, target: b, label: 'Yes', kind: 'sequence', condition: 'none' });
     expect(graph.getEdge('e1')).toEqual(edge);
     expect(graph.addEdge(b, a)?.id).toBe('e2');
+  });
+
+  it('records the kind and the condition, which only sequence flows keep', () => {
+    const { graph, a, b } = twoNodes();
+    expect(graph.addEdge(a, b, '', { condition: 'default' })).toMatchObject({ kind: 'sequence', condition: 'default' });
+    expect(graph.addEdge(a, b, '', { kind: 'message', condition: 'default' })).toMatchObject({ kind: 'message', condition: 'none' });
+    expect(graph.addEdge(a, b, '', { kind: 'association' })).toMatchObject({ kind: 'association', condition: 'none' });
   });
 
   it('records fixed sides only when given', () => {
@@ -146,6 +236,19 @@ describe('edges', () => {
     expect(graph.getEdge(edge.id)?.label).toBe('');
   });
 
+  it('changes the kind, dropping the condition when leaving sequence flows', () => {
+    const { graph, a, b } = twoNodes();
+    const edge = graph.addEdge(a, b, '', { condition: 'conditional' });
+    if (!edge) throw new Error('edge expected');
+    graph.setEdgeKind(edge.id, 'message');
+    expect(graph.getEdge(edge.id)).toMatchObject({ kind: 'message', condition: 'none' });
+    graph.setEdgeCondition(edge.id, 'default');
+    expect(graph.getEdge(edge.id)?.condition).toBe('none');
+    graph.setEdgeKind(edge.id, 'sequence');
+    graph.setEdgeCondition(edge.id, 'default');
+    expect(graph.getEdge(edge.id)).toMatchObject({ kind: 'sequence', condition: 'default' });
+  });
+
   it('fixes and clears the side of either end', () => {
     const { graph, a, b } = twoNodes();
     const edge = graph.addEdge(a, b);
@@ -168,6 +271,8 @@ describe('edges', () => {
     expect(graph.edgeCount).toBe(0);
     graph.setEdgeLabel('e9', 'x');
     graph.setEdgeSide('e9', 'source', 'top');
+    graph.setEdgeKind('e9', 'message');
+    graph.setEdgeCondition('e9', 'default');
     expect(graph.getEdge('e9')).toBeUndefined();
   });
 });
@@ -198,11 +303,12 @@ describe('change notifications', () => {
     const node = graph.addNode(0, 0, 'A');
     graph.moveNode(node.id, 5, 5);
     graph.setNodeLabel(node.id, 'B');
+    graph.setNodeVariant(node.id, 'user');
     graph.setDirected(false);
-    expect(calls).toBe(4);
+    expect(calls).toBe(5);
     unsubscribe();
     graph.addNode(1, 1);
-    expect(calls).toBe(4);
+    expect(calls).toBe(5);
   });
 
   it('does not notify when nothing actually changes', () => {
@@ -212,7 +318,8 @@ describe('change notifications', () => {
     graph.onChange(() => calls++);
     graph.moveNode(node.id, 0, 0);
     graph.setNodeLabel(node.id, 'A');
-    graph.setNodeType(node.id, 'process');
+    graph.setNodeType(node.id, 'task');
+    graph.setNodeVariant(node.id, 'none');
     graph.setDirected(true);
     graph.setEdgeStyle('orthogonal');
     expect(calls).toBe(0);
@@ -220,17 +327,19 @@ describe('change notifications', () => {
 });
 
 describe('JSON export and import', () => {
-  it('toJSON contains the settings, typed nodes and edges with their sides', () => {
+  it('toJSON contains the settings, typed nodes and edges with kind, condition and sides', () => {
     const { graph, a, b } = twoNodes();
-    graph.addEdge(a, b, 'Yes', { sourceSide: 'bottom', targetSide: 'top' });
+    graph.addEdge(a, b, 'Yes', { sourceSide: 'bottom', targetSide: 'top', condition: 'default' });
     expect(graph.toJSON()).toEqual({
       directed: true,
       edgeStyle: 'orthogonal',
       nodes: [
-        { id: 'n1', label: 'A', type: 'process', x: 0, y: 0 },
-        { id: 'n2', label: 'B', type: 'process', x: 100, y: 0 },
+        { id: 'n1', label: 'A', type: 'task', variant: 'none', x: 0, y: 0 },
+        { id: 'n2', label: 'B', type: 'task', variant: 'none', x: 100, y: 0 },
       ],
-      edges: [{ id: 'e1', source: 'n1', target: 'n2', label: 'Yes', sourceSide: 'bottom', targetSide: 'top' }],
+      edges: [
+        { id: 'e1', source: 'n1', target: 'n2', label: 'Yes', kind: 'sequence', condition: 'default', sourceSide: 'bottom', targetSide: 'top' },
+      ],
     });
   });
 
@@ -246,7 +355,9 @@ describe('JSON export and import', () => {
 
   it('round-trips through parse and load', () => {
     const { graph, a, b } = twoNodes();
-    graph.addEdge(a, b, 'Yes', { sourceSide: 'right' });
+    graph.addEdge(a, b, 'Yes', { sourceSide: 'right', kind: 'message' });
+    graph.setNodeType(a, 'gateway');
+    graph.setNodeVariant(a, 'parallel');
     graph.setDirected(false);
     graph.setEdgeStyle('straight');
     const copy = new Graph();
@@ -291,31 +402,54 @@ describe('Graph.parse validation', () => {
     expect(Graph.parse({ nodes: [], edges: [] })).toEqual({ directed: true, edgeStyle: 'straight', nodes: [], edges: [] });
   });
 
-  it('loads files written before types, edge styles and sides existed', () => {
+  it('loads files written by the flowchart version, mapping their types onto BPMN elements', () => {
     const data = Graph.parse({
       nodes: [
-        { id: 'n1', label: 'Old', x: 100, y: 100 },
-        { id: 'n2', label: 'Older', x: 300, y: 100 },
+        { id: 'n1', label: 'Begin', type: 'terminal', x: 0, y: 0 },
+        { id: 'n2', label: 'Work', type: 'process', x: 1, y: 0 },
+        { id: 'n3', label: 'Ok?', type: 'decision', x: 2, y: 0 },
+        { id: 'n4', label: 'Input', type: 'io', x: 3, y: 0 },
+        { id: 'n5', label: 'Old', x: 4, y: 0 },
       ],
       edges: [{ id: 'e1', source: 'n1', target: 'n2', label: '' }],
     });
     expect(data.directed).toBe(true);
     expect(data.edgeStyle).toBe('straight');
-    expect(data.nodes.map((n) => n.type)).toEqual(['process', 'process']);
-    expect(data.edges[0]).toEqual({ id: 'e1', source: 'n1', target: 'n2', label: '' });
+    expect(data.nodes.map((n) => [n.type, n.variant])).toEqual([
+      ['start-event', 'none'],
+      ['task', 'none'],
+      ['gateway', 'exclusive'],
+      ['data-object', 'none'],
+      ['task', 'none'],
+    ]);
+    expect(data.edges[0]).toEqual({ id: 'e1', source: 'n1', target: 'n2', label: '', kind: 'sequence', condition: 'none' });
   });
 
   it('keeps explicit settings and falls back on unknown values', () => {
     const data = Graph.parse({
       directed: false,
       edgeStyle: 'orthogonal',
-      nodes: [{ id: 'n1', type: 'hexagon', x: 0, y: 0 }],
-      edges: [],
+      nodes: [
+        { id: 'n1', type: 'hexagon', variant: 'user', x: 0, y: 0 },
+        { id: 'n2', type: 'gateway', variant: 'user', x: 0, y: 0 },
+        { id: 'n3', type: 'end-event', variant: 'terminate', x: 0, y: 0 },
+      ],
+      edges: [
+        { id: 'e1', source: 'n1', target: 'n2', kind: 'message', condition: 'default' },
+        { id: 'e2', source: 'n1', target: 'n3', kind: 'flow', condition: 'conditional' },
+        { id: 'e3', source: 'n2', target: 'n3', condition: 'sometimes' },
+      ],
     });
     expect(data.directed).toBe(false);
     expect(data.edgeStyle).toBe('orthogonal');
-    expect(data.nodes[0].type).toBe('process');
-    expect(data.nodes[0].label).toBe('n1');
+    expect(data.nodes[0]).toMatchObject({ type: 'task', variant: 'user', label: 'n1' });
+    expect(data.nodes[1]).toMatchObject({ type: 'gateway', variant: 'exclusive' });
+    expect(data.nodes[2]).toMatchObject({ type: 'end-event', variant: 'terminate' });
+    expect(data.edges.map((e) => [e.kind, e.condition])).toEqual([
+      ['message', 'none'],
+      ['sequence', 'conditional'],
+      ['sequence', 'none'],
+    ]);
     expect(Graph.parse({ edgeStyle: 'curvy', nodes: [], edges: [] }).edgeStyle).toBe('straight');
   });
 
@@ -332,7 +466,7 @@ describe('Graph.parse validation', () => {
       ],
       edges: [],
     });
-    expect(data.nodes).toEqual([{ id: 'ok', label: 'Ok', type: 'process', x: 1, y: 2 }]);
+    expect(data.nodes).toEqual([{ id: 'ok', label: 'Ok', type: 'task', variant: 'none', x: 1, y: 2 }]);
   });
 
   it('drops edges that are malformed, duplicated, self-loops or point to missing nodes', () => {
@@ -351,6 +485,6 @@ describe('Graph.parse validation', () => {
         null,
       ],
     });
-    expect(data.edges).toEqual([{ id: 'e1', source: 'a', target: 'b', label: 'ok', sourceSide: 'top' }]);
+    expect(data.edges).toEqual([{ id: 'e1', source: 'a', target: 'b', label: 'ok', kind: 'sequence', condition: 'none', sourceSide: 'top' }]);
   });
 });

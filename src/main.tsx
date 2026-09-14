@@ -18,20 +18,23 @@ function loadSaved(graph: Graph): boolean {
   }
 }
 
-/** Sample flowchart so the canvas is not empty on the first visit. */
+/** Sample BPMN process so the canvas is not empty on the first visit. */
 function seedExample(graph: Graph): void {
-  const start = graph.addNode(300, 60, 'Start', 'terminal');
-  const read = graph.addNode(300, 150, 'Read input', 'io');
-  const valid = graph.addNode(300, 250, 'Valid?', 'decision');
-  const process = graph.addNode(140, 360, 'Process data', 'process');
-  const error = graph.addNode(460, 360, 'Show error', 'process');
-  const end = graph.addNode(300, 470, 'End', 'terminal');
-  graph.addEdge(start.id, read.id, '', { sourceSide: 'bottom', targetSide: 'top' });
-  graph.addEdge(read.id, valid.id, '', { sourceSide: 'bottom', targetSide: 'top' });
-  graph.addEdge(valid.id, process.id, 'Yes', { sourceSide: 'left', targetSide: 'top' });
-  graph.addEdge(valid.id, error.id, 'No', { sourceSide: 'right', targetSide: 'top' });
-  graph.addEdge(process.id, end.id, '', { sourceSide: 'bottom', targetSide: 'left' });
-  graph.addEdge(error.id, end.id, '', { sourceSide: 'bottom', targetSide: 'right' });
+  const start = graph.addNode(60, 160, 'Start', 'start-event');
+  const receive = graph.addNode(200, 160, 'Receive order', 'task', 'user');
+  const inStock = graph.addNode(370, 160, 'In stock?', 'gateway', 'exclusive');
+  const ship = graph.addNode(540, 160, 'Ship order', 'task', 'service');
+  const end = graph.addNode(700, 160, 'End', 'end-event');
+  const notify = graph.addNode(540, 290, 'Notify customer', 'task');
+  const rejected = graph.addNode(700, 290, 'Order rejected', 'end-event', 'message');
+  const note = graph.addNode(370, 50, 'Checked daily', 'annotation');
+  graph.addEdge(start.id, receive.id, '', { sourceSide: 'right', targetSide: 'left' });
+  graph.addEdge(receive.id, inStock.id, '', { sourceSide: 'right', targetSide: 'left' });
+  graph.addEdge(inStock.id, ship.id, 'yes', { sourceSide: 'right', targetSide: 'left', condition: 'conditional' });
+  graph.addEdge(inStock.id, notify.id, 'no', { sourceSide: 'bottom', targetSide: 'left', condition: 'default' });
+  graph.addEdge(ship.id, end.id, '', { sourceSide: 'right', targetSide: 'left' });
+  graph.addEdge(notify.id, rejected.id, '', { sourceSide: 'right', targetSide: 'left' });
+  graph.addEdge(note.id, inStock.id, '', { sourceSide: 'bottom', targetSide: 'top', kind: 'association' });
 }
 
 const graph = new Graph();

@@ -82,8 +82,8 @@ describe('graph view', () => {
 describe('node sizes', () => {
   it('falls back to the label-less box until a size is published', () => {
     withState((app, graph) => {
-      const node = graph.addNode(0, 0, 'A', 'decision');
-      expect(app.sizeOf(node)).toEqual(shapeSize('decision', 0));
+      const node = graph.addNode(0, 0, 'A', 'gateway');
+      expect(app.sizeOf(node)).toEqual(shapeSize('gateway', 0));
       app.setSize(node.id, { width: 200, height: 56 });
       expect(app.sizeOf(node)).toEqual({ width: 200, height: 56 });
     });
@@ -96,7 +96,7 @@ describe('node sizes', () => {
       expect(app.sizeOf(node).width).toBe(500);
       graph.removeNode(node.id);
       graph.load(Graph.parse({ nodes: [{ id: node.id, label: 'A', x: 0, y: 0 }], edges: [] }));
-      expect(app.sizeOf(app.nodes()[0])).toEqual(shapeSize('process', 0));
+      expect(app.sizeOf(app.nodes()[0])).toEqual(shapeSize('task', 0));
     });
   });
 });
@@ -158,10 +158,10 @@ describe('selection', () => {
 
   it('addNodeAt creates a node of the given type at the point and selects it', () => {
     withState((app, graph) => {
-      const node = app.addNodeAt({ x: 40, y: 50 }, 'terminal');
-      expect(graph.getNode(node.id)).toMatchObject({ x: 40, y: 50, type: 'terminal' });
+      const node = app.addNodeAt({ x: 40, y: 50 }, 'start-event');
+      expect(graph.getNode(node.id)).toMatchObject({ x: 40, y: 50, type: 'start-event', variant: 'none' });
       expect(app.selection()).toEqual({ kind: 'node', id: node.id });
-      expect(app.addNodeAt({ x: 0, y: 0 }).type).toBe('process');
+      expect(app.addNodeAt({ x: 0, y: 0 }).type).toBe('task');
     });
   });
 });
@@ -254,7 +254,7 @@ describe('camera', () => {
       const right = graph.addNode(2000, 0, 'R');
       app.fitView();
       const view = app.view();
-      const half = shapeSize('process', 0).width / 2;
+      const half = shapeSize('task', 0).width / 2;
       expect(view.scale).toBeLessThan(1);
       expect((left.x - half) * view.scale + view.tx).toBeCloseTo(48, 6);
       expect((right.x + half) * view.scale + view.tx).toBeCloseTo(752, 6);

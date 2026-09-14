@@ -1,3 +1,18 @@
+.tool-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.tool-group h3 {
+  margin: 0 0 0.3rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
 .tool-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

@@ -17,10 +17,10 @@ export function renderWithApp(ui: () => JSX.Element, prepare?: (graph: Graph) =>
   return { ...result, app, graph };
 }
 
-/** A tiny flow used by several component tests: A (process) → B (decision), 100 px apart. */
+/** A tiny process used by several component tests: A (task, 100×60) → B (exclusive gateway, 50×50), 300 px apart. */
 export function seedPair(graph: Graph): { a: string; b: string; edge: string } {
   const a = graph.addNode(0, 0, 'A').id;
-  const b = graph.addNode(300, 0, 'B', 'decision').id;
+  const b = graph.addNode(300, 0, 'B', 'gateway').id;
   const edge = graph.addEdge(a, b, 'Yes');
   if (!edge) throw new Error('edge expected');
   return { a, b, edge: edge.id };

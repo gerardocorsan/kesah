@@ -53,13 +53,6 @@ export function Toolbar() {
         Redo
       </Button>
       <Checkbox
-        id="chk-directed"
-        label="Directed"
-        title="Edges have a direction and are drawn with an arrowhead"
-        checked={app.directed()}
-        onChange={(on) => app.graph.setDirected(on)}
-      />
-      <Checkbox
         id="chk-orthogonal"
         label="Orthogonal"
         title="Edges run along axis-aligned segments with elbows instead of straight lines"

@@ -28,32 +28,34 @@ describe('Field', () => {
 describe('ToolButton', () => {
   it('shows the shape icon and name, and reports the shape when clicked', () => {
     const picked: NodeType[] = [];
-    const { getByRole } = render(() => <ToolButton type="decision" onPick={(type) => picked.push(type)} />);
+    const { getByRole } = render(() => <ToolButton type="gateway" onPick={(type) => picked.push(type)} />);
     const button = getByRole('button');
-    expect(button).toHaveTextContent('Decision');
-    expect(button).toHaveAttribute('data-type', 'decision');
+    expect(button).toHaveTextContent('Gateway');
+    expect(button).toHaveAttribute('data-type', 'gateway');
     expect(button.getAttribute('title')).not.toBe('');
     expect(button.querySelector('svg.shape-icon path')).not.toBeNull();
     fireEvent.click(button);
-    expect(picked).toEqual(['decision']);
+    expect(picked).toEqual(['gateway']);
   });
 });
 
 describe('ShapePicker', () => {
-  it('offers the four flowchart shapes in order', () => {
+  it('offers the eight BPMN elements in order, grouped as events, activities, gateways and artifacts', () => {
     const { container, getAllByRole } = render(() => <ShapePicker onPick={() => undefined} />);
     expect(container.querySelector('#add-node-tools')).not.toBeNull();
     const buttons = getAllByRole('button');
-    expect(buttons.map((b) => b.getAttribute('data-type'))).toEqual(['terminal', 'process', 'decision', 'io']);
-    expect(buttons.map((b) => b.textContent)).toEqual(['Terminal', 'Process', 'Decision', 'Input / Output']);
+    expect(buttons.map((b) => b.getAttribute('data-type'))).toEqual(['start-event', 'intermediate-event', 'end-event', 'task', 'subprocess', 'gateway', 'annotation', 'data-object']);
+    expect(buttons.map((b) => b.textContent)).toEqual(['Start', 'Intermediate', 'End', 'Task', 'Sub-process', 'Gateway', 'Annotation', 'Data object']);
+    expect([...container.querySelectorAll('.tool-group h3')].map((h) => h.textContent)).toEqual(['Events', 'Activities', 'Gateways', 'Artifacts']);
+    expect(container.querySelectorAll('.tool-group')[0].querySelectorAll('button')).toHaveLength(3);
   });
 
-  it('reports the picked shape', () => {
+  it('reports the picked element', () => {
     const picked: NodeType[] = [];
     const { getByText } = render(() => <ShapePicker onPick={(type) => picked.push(type)} />);
-    fireEvent.click(getByText('Input / Output'));
-    fireEvent.click(getByText('Terminal'));
-    expect(picked).toEqual(['io', 'terminal']);
+    fireEvent.click(getByText('Data object'));
+    fireEvent.click(getByText('Start'));
+    expect(picked).toEqual(['data-object', 'start-event']);
   });
 });
 
@@ -62,7 +64,7 @@ describe('NodeListItem', () => {
     const selected: string[] = [];
     const [active, setActive] = createSignal(false);
     const { getByRole } = render(() => (
-      <NodeListItem id="n3" type="terminal" label="Start" active={active()} onSelect={(id) => selected.push(id)} />
+      <NodeListItem id="n3" type="start-event" label="Start" active={active()} onSelect={(id) => selected.push(id)} />
     ));
     const button = getByRole('button');
     expect(button.closest('li')).not.toBeNull();
@@ -77,7 +79,7 @@ describe('NodeListItem', () => {
   });
 
   it('falls back to the id when the name is empty', () => {
-    const { getByRole } = render(() => <NodeListItem id="n9" type="process" label="" active={false} onSelect={() => undefined} />);
+    const { getByRole } = render(() => <NodeListItem id="n9" type="task" label="" active={false} onSelect={() => undefined} />);
     expect(getByRole('button').querySelector('.node-name')).toHaveTextContent('n9');
   });
 });

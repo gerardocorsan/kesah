@@ -1,12 +1,12 @@
 import { createEffect, createSignal, on } from 'solid-js';
-import { isNodeType, isSide } from '../../model/graph';
+import { NODE_VARIANTS, isEdgeKind, isFlowCondition, isNodeType, isSide } from '../../model/graph';
 import { useApp } from '../../state/app';
 import { Button } from '../atoms/Button';
 import { Muted } from '../atoms/Muted';
 import { Select } from '../atoms/Select';
 import { TextInput } from '../atoms/TextInput';
 import { Field } from '../molecules/Field';
-import { NODE_TYPE_OPTIONS, SIDE_OPTIONS } from '../labels';
+import { CONDITION_OPTIONS, EDGE_KIND_OPTIONS, NODE_TYPE_OPTIONS, SIDE_OPTIONS, VARIANT_FIELD_LABEL, variantOptions } from '../labels';
 import './panel.css';
 
 /** Organism: the properties of the selected node or edge, editable in place. */
@@ -29,6 +29,10 @@ export function InspectorPanel() {
   const hasSelection = () => node() !== undefined || edge() !== undefined;
   const title = () => (node() ? 'Node' : edge() ? 'Edge' : 'Selection');
   const modelLabel = () => node()?.label ?? edge()?.label ?? '';
+  const variantLabel = () => {
+    const n = node();
+    return n && NODE_VARIANTS[n.type].length > 0 ? (VARIANT_FIELD_LABEL[n.type] ?? 'Variant') : null;
+  };
   const info = () => {
     const n = node();
     if (n) {
@@ -39,7 +43,7 @@ export function InspectorPanel() {
     if (!e) return '';
     const source = app.graph.getNode(e.source)?.label ?? e.source;
     const target = app.graph.getNode(e.target)?.label ?? e.target;
-    return `${source} ${app.directed() ? '→' : '—'} ${target}`;
+    return `${source} → ${target}`;
   };
 
   // While the name field has focus it shows what is being typed, not the model:
@@ -107,14 +111,50 @@ export function InspectorPanel() {
             }}
           />
         </Field>
-        <Field id="type-field" label="Shape" hidden={!node()}>
+        <Field id="type-field" label="Type" hidden={!node()}>
           <Select
             id="sel-type"
-            value={node()?.type ?? 'process'}
+            value={node()?.type ?? 'task'}
             options={NODE_TYPE_OPTIONS}
             onChange={(value) => {
               const n = node();
               if (n && isNodeType(value)) app.graph.setNodeType(n.id, value);
+            }}
+          />
+        </Field>
+        <Field id="variant-field" label={variantLabel() ?? 'Variant'} hidden={!variantLabel()}>
+          <Select
+            id="sel-variant"
+            value={node()?.variant ?? 'none'}
+            options={(() => {
+              const n = node();
+              return n ? variantOptions(n.type) : [];
+            })()}
+            onChange={(value) => {
+              const n = node();
+              if (n) app.graph.setNodeVariant(n.id, value);
+            }}
+          />
+        </Field>
+        <Field id="kind-field" label="Kind" hidden={!edge()}>
+          <Select
+            id="sel-kind"
+            value={edge()?.kind ?? 'sequence'}
+            options={EDGE_KIND_OPTIONS}
+            onChange={(value) => {
+              const e = edge();
+              if (e && isEdgeKind(value)) app.graph.setEdgeKind(e.id, value);
+            }}
+          />
+        </Field>
+        <Field id="condition-field" label="Condition" hidden={edge()?.kind !== 'sequence'}>
+          <Select
+            id="sel-condition"
+            value={edge()?.condition ?? 'none'}
+            options={CONDITION_OPTIONS}
+            onChange={(value) => {
+              const e = edge();
+              if (e && isFlowCondition(value)) app.graph.setEdgeCondition(e.id, value);
             }}
           />
         </Field>

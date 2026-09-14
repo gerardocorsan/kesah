@@ -11,7 +11,7 @@ describe('NodeListPanel', () => {
     const rows = [...container.querySelectorAll('#node-list button')];
     expect(rows.map((r) => r.querySelector('.node-name')?.textContent)).toEqual(['A', 'B']);
     expect(rows.every((r) => r.querySelector('svg.shape-icon path'))).toBe(true);
-    graph.addNode(0, 0, 'C', 'terminal');
+    graph.addNode(0, 0, 'C', 'start-event');
     graph.setNodeLabel('n1', 'Alpha');
     expect(container.querySelector('#node-count')).toHaveTextContent('3');
     expect([...container.querySelectorAll('.node-name')].map((n) => n.textContent)).toEqual(['Alpha', 'B', 'C']);

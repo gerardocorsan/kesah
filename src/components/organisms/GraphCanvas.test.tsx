@@ -8,7 +8,7 @@ import { GraphCanvas } from './GraphCanvas';
  * step), Shift+drag or connect mode to connect, side handles fix the sides, double-click to
  * create or edit, wheel to zoom, Delete/Backspace, Escape, C and the undo/redo shortcuts.
  * Coordinates: the canvas is 800×600 at the page origin with the camera at identity, so screen
- * and canvas coordinates coincide. A sits at (0,0) and B at (300,0).
+ * and canvas coordinates coincide. A (task, 100×60) sits at (0,0) and B (gateway, 50×50) at (300,0).
  */
 
 function setup() {
@@ -162,17 +162,17 @@ describe('connecting nodes', () => {
 
   it('fixes both sides when dragging from a handle to a handle', () => {
     const { ids, port, node, graph } = setup();
-    pointer(port(ids.a, 'bottom'), 'pointerdown', 0, 20);
+    pointer(port(ids.a, 'bottom'), 'pointerdown', 0, 30);
     const restore = underPointer(port(ids.b, 'top'));
-    pointer(node(ids.a), 'pointerup', 300, -28);
+    pointer(node(ids.a), 'pointerup', 300, -25);
     restore();
     expect(graph.edgeList[1]).toMatchObject({ source: ids.a, target: ids.b, sourceSide: 'bottom', targetSide: 'top' });
   });
 
   it('fixes only the source side when dropping on the body of the target', () => {
     const { ids, port, node, graph, app } = setup();
-    pointer(port(ids.a, 'right'), 'pointerdown', 36, 0);
-    expect(app.preview()).toMatchObject({ x1: 37, y1: 0 });
+    pointer(port(ids.a, 'right'), 'pointerdown', 50, 0);
+    expect(app.preview()).toMatchObject({ x1: 51, y1: 0 });
     const restore = underPointer(node(ids.b));
     pointer(node(ids.a), 'pointerup', 300, 0);
     restore();
@@ -205,12 +205,12 @@ describe('double-click', () => {
   const dblclick = (target: Element, x: number, y: number) =>
     target.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, clientX: x, clientY: y }));
 
-  it('creates a process node under the pointer and selects it', () => {
+  it('creates a task under the pointer and selects it', () => {
     const { app, graph, background } = setup();
     dblclick(background, 200, 150);
     expect(graph.nodeCount).toBe(3);
     const created = graph.nodeList[2];
-    expect(created).toMatchObject({ type: 'process', x: 200, y: 150 });
+    expect(created).toMatchObject({ type: 'task', variant: 'none', x: 200, y: 150 });
     expect(app.selection()).toEqual({ kind: 'node', id: created.id });
   });
 

@@ -1,13 +1,70 @@
 export type NodeId = string;
 export type EdgeId = string;
 
-/** Flowchart symbol drawn for a node. */
-export type NodeType = 'terminal' | 'process' | 'decision' | 'io';
-export const NODE_TYPES: readonly NodeType[] = ['terminal', 'process', 'decision', 'io'];
-export const DEFAULT_NODE_TYPE: NodeType = 'process';
+/** BPMN element drawn for a node, in palette order. */
+export type NodeType =
+  | 'start-event'
+  | 'intermediate-event'
+  | 'end-event'
+  | 'task'
+  | 'subprocess'
+  | 'gateway'
+  | 'annotation'
+  | 'data-object';
+export const NODE_TYPES: readonly NodeType[] = [
+  'start-event',
+  'intermediate-event',
+  'end-event',
+  'task',
+  'subprocess',
+  'gateway',
+  'annotation',
+  'data-object',
+];
+export const DEFAULT_NODE_TYPE: NodeType = 'task';
+
+/**
+ * Variants a type can take: the trigger or result of an event, the type of a task,
+ * the kind of a gateway. Types without variants always use 'none'.
+ */
+export const NODE_VARIANTS: Record<NodeType, readonly string[]> = {
+  'start-event': ['none', 'message', 'timer'],
+  'intermediate-event': ['none', 'message', 'timer'],
+  'end-event': ['none', 'message', 'terminate'],
+  task: ['none', 'user', 'service', 'script'],
+  subprocess: [],
+  gateway: ['exclusive', 'parallel', 'inclusive'],
+  annotation: [],
+  'data-object': [],
+};
 
 export function isNodeType(value: unknown): value is NodeType {
   return typeof value === 'string' && (NODE_TYPES as readonly string[]).includes(value);
+}
+
+export function defaultVariant(type: NodeType): string {
+  return NODE_VARIANTS[type][0] ?? 'none';
+}
+
+export function isVariantOf(type: NodeType, value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  const variants = NODE_VARIANTS[type];
+  return variants.length === 0 ? value === 'none' : variants.includes(value);
+}
+
+/** Types of the flowchart notation Kesah started with, mapped onto BPMN elements when an old file is loaded. */
+const LEGACY_TYPES: Record<string, NodeType> = {
+  terminal: 'start-event',
+  process: 'task',
+  decision: 'gateway',
+  io: 'data-object',
+};
+
+/** The BPMN type for a stored type value: current names, legacy flowchart names, or the default. */
+export function resolveNodeType(value: unknown): NodeType {
+  if (isNodeType(value)) return value;
+  if (typeof value === 'string' && Object.hasOwn(LEGACY_TYPES, value)) return LEGACY_TYPES[value];
+  return DEFAULT_NODE_TYPE;
 }
 
 /** Side of a node through which an edge leaves or enters. */
@@ -21,10 +78,27 @@ export function isSide(value: unknown): value is Side {
 /** How edges are drawn: one straight segment, or axis-aligned segments joined by elbows. */
 export type EdgeStyle = 'straight' | 'orthogonal';
 
+/** BPMN connection drawn for an edge. */
+export type EdgeKind = 'sequence' | 'message' | 'association';
+export const EDGE_KINDS: readonly EdgeKind[] = ['sequence', 'message', 'association'];
+
+export function isEdgeKind(value: unknown): value is EdgeKind {
+  return typeof value === 'string' && (EDGE_KINDS as readonly string[]).includes(value);
+}
+
+/** Marker at the source of a sequence flow: none, the default path out of a gateway, or a conditional path. */
+export type FlowCondition = 'none' | 'default' | 'conditional';
+export const FLOW_CONDITIONS: readonly FlowCondition[] = ['none', 'default', 'conditional'];
+
+export function isFlowCondition(value: unknown): value is FlowCondition {
+  return typeof value === 'string' && (FLOW_CONDITIONS as readonly string[]).includes(value);
+}
+
 export interface GraphNode {
   id: NodeId;
   label: string;
   type: NodeType;
+  variant: string;
   x: number;
   y: number;
 }
@@ -34,19 +108,25 @@ export interface GraphEdge {
   source: NodeId;
   target: NodeId;
   label: string;
+  kind: EdgeKind;
+  /** Only meaningful for sequence flows; always 'none' otherwise. */
+  condition: FlowCondition;
   /** Side of the source node the edge leaves through; chosen automatically when absent. */
   sourceSide?: Side;
   /** Side of the target node the edge enters through; chosen automatically when absent. */
   targetSide?: Side;
 }
 
-export interface EdgeSides {
+export interface EdgeOptions {
   sourceSide?: Side;
   targetSide?: Side;
+  kind?: EdgeKind;
+  condition?: FlowCondition;
 }
 
 /** Interchange format: what gets exported to and imported from JSON. */
 export interface GraphData {
+  /** Kept for files written when the notation had undirected graphs; the BPMN view ignores it. */
   directed: boolean;
   edgeStyle: EdgeStyle;
   nodes: GraphNode[];
@@ -139,21 +219,38 @@ export class Graph {
     this.emit();
   }
 
-  addNode(x: number, y: number, label?: string, type: NodeType = DEFAULT_NODE_TYPE): GraphNode {
+  addNode(x: number, y: number, label?: string, type: NodeType = DEFAULT_NODE_TYPE, variant?: string): GraphNode {
     let id: NodeId;
     do {
       id = `n${++this.nodeSeq}`;
     } while (this.nodes.has(id));
-    const node: GraphNode = { id, label: label ?? String(this.nodeSeq), type, x, y };
+    const node: GraphNode = {
+      id,
+      label: label ?? String(this.nodeSeq),
+      type,
+      variant: isVariantOf(type, variant) ? variant : defaultVariant(type),
+      x,
+      y,
+    };
     this.nodes.set(id, node);
     this.emit();
     return node;
   }
 
+  /** Changes the element type; the variant is kept when the new type accepts it and reset otherwise. */
   setNodeType(id: NodeId, type: NodeType): void {
     const node = this.nodes.get(id);
     if (!node || node.type === type) return;
     node.type = type;
+    if (!isVariantOf(type, node.variant)) node.variant = defaultVariant(type);
+    this.emit();
+  }
+
+  /** Sets the variant if the node's type accepts it; ignored otherwise. */
+  setNodeVariant(id: NodeId, variant: string): void {
+    const node = this.nodes.get(id);
+    if (!node || node.variant === variant || !isVariantOf(node.type, variant)) return;
+    node.variant = variant;
     this.emit();
   }
 
@@ -194,15 +291,23 @@ export class Graph {
    * Creates an edge. Returns null for self-loops or missing nodes. Several
    * edges may join the same two nodes; they are told apart by their sides.
    */
-  addEdge(source: NodeId, target: NodeId, label = '', sides: EdgeSides = {}): GraphEdge | null {
+  addEdge(source: NodeId, target: NodeId, label = '', options: EdgeOptions = {}): GraphEdge | null {
     if (source === target || !this.nodes.has(source) || !this.nodes.has(target)) return null;
     let id: EdgeId;
     do {
       id = `e${++this.edgeSeq}`;
     } while (this.edges.has(id));
-    const edge: GraphEdge = { id, source, target, label };
-    if (sides.sourceSide) edge.sourceSide = sides.sourceSide;
-    if (sides.targetSide) edge.targetSide = sides.targetSide;
+    const kind = options.kind ?? 'sequence';
+    const edge: GraphEdge = {
+      id,
+      source,
+      target,
+      label,
+      kind,
+      condition: kind === 'sequence' ? (options.condition ?? 'none') : 'none',
+    };
+    if (options.sourceSide) edge.sourceSide = options.sourceSide;
+    if (options.targetSide) edge.targetSide = options.targetSide;
     this.edges.set(id, edge);
     this.emit();
     return edge;
@@ -212,6 +317,23 @@ export class Graph {
     const edge = this.edges.get(id);
     if (!edge || edge.label === label) return;
     edge.label = label;
+    this.emit();
+  }
+
+  /** Changes the connection kind. Leaving the sequence kind drops the flow condition. */
+  setEdgeKind(id: EdgeId, kind: EdgeKind): void {
+    const edge = this.edges.get(id);
+    if (!edge || edge.kind === kind) return;
+    edge.kind = kind;
+    if (kind !== 'sequence') edge.condition = 'none';
+    this.emit();
+  }
+
+  /** Sets the flow condition of a sequence flow; ignored for other kinds. */
+  setEdgeCondition(id: EdgeId, condition: FlowCondition): void {
+    const edge = this.edges.get(id);
+    if (!edge || edge.kind !== 'sequence' || edge.condition === condition) return;
+    edge.condition = condition;
     this.emit();
   }
 
@@ -264,10 +386,11 @@ export class Graph {
   /**
    * Validates an unknown value (for example imported JSON) and turns it into
    * sanitized GraphData: malformed or duplicated nodes are dropped, as are
-   * edges pointing at missing nodes. A missing or unknown node type becomes
-   * the default one, and a missing edge style means straight lines, so files
-   * written before those fields existed still load and look the same.
-   * Throws if the basic shape is wrong.
+   * edges pointing at missing nodes. Flowchart-era types are mapped onto BPMN
+   * elements, unknown types and variants take defaults, a missing edge kind is
+   * a sequence flow, and a missing edge style means straight lines, so files
+   * written before those fields existed still load. Throws if the basic
+   * shape is wrong.
    */
   static parse(value: unknown): GraphData {
     if (!isRecord(value) || !Array.isArray(value.nodes) || !Array.isArray(value.edges)) {
@@ -280,10 +403,12 @@ export class Graph {
       if (!isRecord(raw) || typeof raw.id !== 'string' || nodeIds.has(raw.id)) continue;
       if (!isFiniteNumber(raw.x) || !isFiniteNumber(raw.y)) continue;
       nodeIds.add(raw.id);
+      const type = resolveNodeType(raw.type);
       nodes.push({
         id: raw.id,
         label: typeof raw.label === 'string' ? raw.label : raw.id,
-        type: isNodeType(raw.type) ? raw.type : DEFAULT_NODE_TYPE,
+        type,
+        variant: isVariantOf(type, raw.variant) ? raw.variant : defaultVariant(type),
         x: raw.x,
         y: raw.y,
       });
@@ -296,11 +421,14 @@ export class Graph {
       if (typeof raw.source !== 'string' || typeof raw.target !== 'string') continue;
       if (raw.source === raw.target || !nodeIds.has(raw.source) || !nodeIds.has(raw.target)) continue;
       edgeIds.add(raw.id);
+      const kind = isEdgeKind(raw.kind) ? raw.kind : 'sequence';
       const edge: GraphEdge = {
         id: raw.id,
         source: raw.source,
         target: raw.target,
         label: typeof raw.label === 'string' ? raw.label : '',
+        kind,
+        condition: kind === 'sequence' && isFlowCondition(raw.condition) ? raw.condition : 'none',
       };
       if (isSide(raw.sourceSide)) edge.sourceSide = raw.sourceSide;
       if (isSide(raw.targetSide)) edge.targetSide = raw.targetSide;

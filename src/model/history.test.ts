@@ -55,8 +55,8 @@ describe('History', () => {
       directed: true,
       edgeStyle: 'orthogonal',
       nodes: [
-        { id: 'n1', label: 'A', type: 'process', x: 0, y: 0 },
-        { id: 'n2', label: 'B', type: 'process', x: 100, y: 0 },
+        { id: 'n1', label: 'A', type: 'task', variant: 'none', x: 0, y: 0 },
+        { id: 'n2', label: 'B', type: 'task', variant: 'none', x: 100, y: 0 },
       ],
       edges: [],
     });

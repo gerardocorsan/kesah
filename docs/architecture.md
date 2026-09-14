@@ -45,14 +45,23 @@ Three rules keep the layers apart:
   and `e1, e2, …`, continuing after the highest id present when a document is loaded.
 - Every mutating method notifies subscribers **once, and only when something changed** (moving a node
   to where it already is does nothing). Undo, autosave and the reactive state all hang off this.
+- A node has a `type` (one of the eight BPMN elements) and a `variant` (event trigger, task type or
+  gateway kind; `none` for types without variants). `NODE_VARIANTS` is the single list of what each
+  type accepts; `setNodeType` keeps a variant the new type accepts and resets it otherwise, and
+  `setNodeVariant` ignores anything the type does not accept. An edge has a `kind` (sequence,
+  message, association) and a `condition` that only sequence flows keep.
 - `Graph.parse` is the only entry for untrusted data. It never throws for a bad node or edge; it drops
-  them. It throws only when the value is not an object with `nodes` and `edges` arrays. Missing
-  fields take the defaults that keep old files looking the same: `type` → `process`,
-  `edgeStyle` → `straight`, `directed` → `true`, sides absent → automatic.
-- A new, empty `Graph` is `directed` and `orthogonal`; a parsed file without `edgeStyle` is `straight`.
+  them. It throws only when the value is not an object with `nodes` and `edges` arrays. Missing or
+  unknown fields take defaults so old files load and look the same: flowchart types map onto BPMN
+  elements (`terminal → start-event`, `process → task`, `decision → gateway`, `io → data-object`),
+  anything else → `task`; invalid variant → the type's default; missing `kind` → `sequence`;
+  `edgeStyle` → `straight`; sides absent → automatic.
+- `directed` survives in the JSON and on the class for files written before BPMN, but the view no
+  longer reads it: every connection kind has its own arrowhead rule.
+- A new, empty `Graph` is `orthogonal`; a parsed file without `edgeStyle` is `straight`.
   This asymmetry is deliberate: new work gets elbows, old files keep their straight look.
 - Self-loops are rejected. Several edges between the same two nodes are allowed since side handles
-  exist; the fan-out (below) keeps them apart.
+  exist; the fan-out (below) keeps them apart. The editor draws; it does not validate BPMN rules.
 
 ## Reactivity over an in-place model
 
@@ -73,8 +82,10 @@ Solid tracks signals, not object fields, and the graph mutates its objects. The 
 
 Node sizes live in the state, not in the model. `NodeShape` measures its label once per label or
 type change (`getComputedTextLength`, an effect, not a render read) and publishes the box; edges,
-fit-to-view and node placement read it through `sizeOf`. Until measured, a node is assumed to have
-the box of its label-less shape.
+fit-to-view and node placement read it through `sizeOf`. Only shapes that grow with their label
+(tasks, sub-processes, annotations) are measured; events, gateways and data objects have a fixed
+box and draw their label below it. Until measured, a node is assumed to have the box of its
+label-less shape.
 
 ## Coordinates and the camera
 
@@ -88,22 +99,37 @@ the box of its label-less shape.
 
 ## Geometry
 
-### Shapes (`shapes.ts`)
+### Shapes (`shapes.ts`, `glyphs.ts`)
 
-Each node type has a sizing rule (width grows with the label, height is fixed), an outline path
-centred on the origin, and two ways to find its border:
+A BPMN symbol is composed of three layers, all pure data the view turns into SVG:
+
+- the **outline** (`shapePath`): the filled, clickable body — a circle for events, a rounded
+  rectangle for tasks and sub-processes, a rhombus for gateways, a page with a cut corner for data
+  objects, and a plain rectangle for annotations, whose visible part is a decoration;
+- **decorations** (`decorations`): extra strokes that depend on type and variant — the inner circle
+  of intermediate events, the filled disc of terminate end events, the ⊞ marker of collapsed
+  sub-processes, the annotation bracket, the fold line of the data object;
+- the **glyph** (`glyphFor`): a 16×16 stroked icon for the variant — envelope, clock, user, gears,
+  script, and the ×, + and ○ of gateways — with a placement rule per type (centred in events, at
+  1.5× in gateways, top-left with a 6 px inset in tasks).
+
+The thick border of end events is a CSS rule keyed on `data-type`, not geometry.
+
+Sizing (`shapeSize`) and label placement (`labelPlacement`) go together: tasks, sub-processes and
+annotations widen with their label and keep it inside; events, gateways and data objects have a
+fixed box and put the label 14 px below it. Two functions find the border:
 
 - `boundaryDistance(type, size, ux, uy)`: distance from the centre to the outline along a unit
-  direction. Exact for the rectangle, the rhombus and the pill (the pill's end caps are solved as a
-  circle intersection); the parallelogram is treated as its bounding box. Straight edges with
-  automatic sides use it to stop at the border.
+  direction. Exact for circles and rhombi; the other symbols are treated as their bounding box.
+  Straight edges with automatic sides use it to stop at the border.
 - `pointOnSide(type, size, side, offset)`: the point on the outline on a given side, `offset` units
-  along that side. Exact for every shape, including the parallelogram's slanted sides. Used for the
-  side handles and for fanning out edges that share a side. Offsets are clamped so the point stays
-  on the shape.
+  along that side, exact for every symbol. Used for the side handles and for fanning out edges that
+  share a side. Offsets are clamped so the point stays on the shape.
 
-Adding a shape means: a new `NodeType`, a sizing rule, an outline path, the two border functions,
-a display name in `components/labels.ts`, and tests for each. Nothing else knows the list of shapes.
+Adding an element means: a new `NodeType` with its `NODE_VARIANTS` entry, a sizing rule, an
+outline, decorations and glyph placement where needed, display names in `components/labels.ts`,
+and tests for each. The palette, the inspector and the icons follow `NODE_TYPES` and
+`NODE_VARIANTS`; nothing else knows the list.
 
 ### Edges (`routing.ts`, `layout.ts`)
 
@@ -127,6 +153,15 @@ itself is collapsed so no zero-length segment remains (the arrowhead needs a dir
 
 `layoutEdges` is pure and takes the node and edge lists; the state wraps it in a memo keyed by edge
 id. Edge components look their layout up by id so `<For each={edges()}>` keeps its DOM.
+
+The kind of a connection changes only how the same route is drawn. `EdgePath` sets a class per
+kind (dash patterns live in CSS) and picks SVG markers: `marker-end` is the filled `arrow` for
+sequence flows, the unfilled `arrow-open` for message flows and nothing for associations;
+`marker-start` is the `flow-default` slash or `flow-conditional` diamond of a sequence flow's
+condition, or the `message-start` dot. `ArrowMarkers` defines every marker twice, plain and
+`-selected`, because a marker cannot inherit the colour of the path that references it in every
+browser. The slash marker has a negative `refX` so it sits a little way along the first segment
+instead of on the node border.
 
 ## Gestures (`organisms/gestures.ts`)
 
@@ -201,16 +236,27 @@ flowchart is created. Export writes the same JSON with a `.json` name; import go
 
 ## Known limitations
 
+- No pools, lanes or expanded sub-processes: the model is flat, with no containment. Adding them
+  is the next block of the BPMN work and needs a container concept in the model, resizing gestures
+  and sizes stored in the document.
+- No BPMN 2.0 XML: the interchange format is the JSON in the README.
+- No validation of BPMN rules: any connection kind may join any two elements.
 - Edges do not route around nodes; crossings are the user's to fix by moving nodes or fixing sides.
 - No self-loops.
-- Labels are single-line; a very long label makes a very wide node.
+- Labels are single-line and cannot be moved; a very long label makes a very wide task or
+  annotation, and a label under an event or gateway may overlap a neighbour or a connection
+  leaving through the bottom side (the label is drawn with a halo so it stays readable, but it can
+  hide that connection's default or conditional mark).
 - Undo/redo shortcuts are not blocked during a gesture; using them mid-drag is unspecified.
 - One document at a time; no multi-selection, no copy/paste, no touch-specific gestures beyond what
   pointer events give for free.
 
 ## Extension points
 
-- **A new shape**: see *Shapes* above; the picker, the inspector and the icons follow `NODE_TYPES`.
+- **A new element or variant**: see *Shapes* above; the picker, the inspector and the icons follow
+  `NODE_TYPES` and `NODE_VARIANTS`.
+- **A new connection kind**: add it to `EDGE_KINDS`, its markers to `ArrowMarkers`, its dash pattern
+  to the stylesheet and its display name to `components/labels.ts`.
 - **A new tool or action**: add the action to `AppState` (it owns the graph and the camera), a button
   in the right organism, and a keyboard shortcut in `gestures.ts` if it needs one.
 - **A new node or edge property**: add it to the model type and to `Graph.parse` with a default for

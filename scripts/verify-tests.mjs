@@ -4,22 +4,33 @@ import { spawnSync } from 'node:child_process';
 /**
  * Mutation check: for every unit, break its implementation in a specific way, run the tests
  * that should notice, and restore the file. A mutation that survives means a test verifies
- * nothing and must be rewritten. Run with `node scripts/verify-tests.mjs`; exits non-zero if
- * any mutation survives.
+ * nothing and must be rewritten. Run with `node scripts/verify-tests.mjs [unit-name-filter…]`;
+ * exits non-zero if any mutation survives or hangs.
  */
+
+const DATA_OBJECT_PATH = 'return `M ${-w} ${-h} H ${w - FOLD} L ${w} ${-h + FOLD} V ${h} H ${-w} Z`;';
+const PLAIN_RECT_PATH = 'return `M ${-w} ${-h} H ${w} V ${h} H ${-w} Z`;';
 
 /** @type {{ unit: string; file: string; what: string; find: string | RegExp; replace: string; tests: string[] }[]} */
 const MUTATIONS = [
   // Model
   { unit: 'graph.addEdge', file: 'src/model/graph.ts', what: 'always returns null', find: 'if (source === target || !this.nodes.has(source) || !this.nodes.has(target)) return null;', replace: 'return null;', tests: ['src/model/graph.test.ts'] },
-  { unit: 'graph.parse', file: 'src/model/graph.ts', what: 'unknown node type becomes decision', find: 'type: isNodeType(raw.type) ? raw.type : DEFAULT_NODE_TYPE,', replace: "type: 'decision',", tests: ['src/model/graph.test.ts'] },
+  { unit: 'graph.resolveNodeType', file: 'src/model/graph.ts', what: 'legacy flowchart types not mapped', find: "if (typeof value === 'string' && Object.hasOwn(LEGACY_TYPES, value)) return LEGACY_TYPES[value];", replace: ';', tests: ['src/model/graph.test.ts'] },
+  { unit: 'graph.setNodeVariant', file: 'src/model/graph.ts', what: 'accepts variants of other types', find: 'if (!node || node.variant === variant || !isVariantOf(node.type, variant)) return;', replace: 'if (!node || node.variant === variant) return;', tests: ['src/model/graph.test.ts'] },
+  { unit: 'graph.setNodeType', file: 'src/model/graph.ts', what: 'keeps an invalid variant', find: 'if (!isVariantOf(type, node.variant)) node.variant = defaultVariant(type);', replace: ';', tests: ['src/model/graph.test.ts'] },
+  { unit: 'graph.setEdgeKind', file: 'src/model/graph.ts', what: 'keeps the condition on message flows', find: "if (kind !== 'sequence') edge.condition = 'none';", replace: ';', tests: ['src/model/graph.test.ts'] },
   { unit: 'graph.removeNode', file: 'src/model/graph.ts', what: 'keeps the incident edges', find: 'if (edge.source === id || edge.target === id) this.edges.delete(edgeId);', replace: ';', tests: ['src/model/graph.test.ts'] },
   { unit: 'graph.setEdgeSide', file: 'src/model/graph.ts', what: 'never clears a side', find: 'else delete edge[key];', replace: "else edge[key] = 'top';", tests: ['src/model/graph.test.ts'] },
   { unit: 'graph.onChange', file: 'src/model/graph.ts', what: 'moveNode never notifies', find: 'node.x = x;\n    node.y = y;\n    this.emit();', replace: 'node.x = x;\n    node.y = y;', tests: ['src/model/graph.test.ts'] },
-  { unit: 'shapes.shapeSize', file: 'src/model/shapes.ts', what: 'decision width ignores the 1.6 factor', find: 'Math.ceil(text * 1.6) + 24', replace: 'text + 24', tests: ['src/model/shapes.test.ts'] },
-  { unit: 'shapes.shapePath', file: 'src/model/shapes.ts', what: 'parallelogram without slant', find: 'const skew = ioSkew(size.height);\n      return `M', replace: 'const skew = 0;\n      return `M', tests: ['src/model/shapes.test.ts'] },
-  { unit: 'shapes.boundaryDistance', file: 'src/model/shapes.ts', what: 'pill treated as a box', find: "case 'terminal':\n      return pillDistance(size, ux, uy);", replace: "case 'terminal':\n      return rectDistance(size, ux, uy);", tests: ['src/model/shapes.test.ts'] },
+  { unit: 'graph.parse (kind)', file: 'src/model/graph.ts', what: 'edge kind ignored on import', find: "const kind = isEdgeKind(raw.kind) ? raw.kind : 'sequence';", replace: "const kind = 'sequence';", tests: ['src/model/graph.test.ts'] },
+  { unit: 'shapes.shapeSize', file: 'src/model/shapes.ts', what: 'tasks do not grow with the label', find: 'return { width: Math.max(TASK_MIN_WIDTH, text + LABEL_PADDING), height: TASK_HEIGHT };', replace: 'return { width: TASK_MIN_WIDTH, height: TASK_HEIGHT };', tests: ['src/model/shapes.test.ts'] },
+  { unit: 'shapes.shapePath', file: 'src/model/shapes.ts', what: 'data object without folded corner', find: DATA_OBJECT_PATH, replace: PLAIN_RECT_PATH, tests: ['src/model/shapes.test.ts'] },
+  { unit: 'shapes.decorations', file: 'src/model/shapes.ts', what: 'intermediate events without inner circle', find: "case 'intermediate-event':\n      return [{ role: 'inner', d: circlePath(h - 3) }];", replace: "case 'intermediate-event':\n      return [];", tests: ['src/model/shapes.test.ts'] },
+  { unit: 'shapes.labelPlacement', file: 'src/model/shapes.ts', what: 'every label inside', find: "return growsWithLabel(type) ? 'inside' : 'below';", replace: "return 'inside';", tests: ['src/model/shapes.test.ts'] },
+  { unit: 'shapes.boundaryDistance', file: 'src/model/shapes.ts', what: 'events treated as a box', find: "case 'circle':\n      return Math.min(size.width, size.height) / 2;", replace: "case 'circle':\n      return rectDistance(size, ux, uy);", tests: ['src/model/shapes.test.ts'] },
   { unit: 'shapes.pointOnSide', file: 'src/model/shapes.ts', what: 'ignores the offset', find: 'const o = clamp(offset, -limit, limit);', replace: 'const o = 0;', tests: ['src/model/shapes.test.ts'] },
+  { unit: 'glyphs.glyphFor', file: 'src/model/glyphs.ts', what: 'never shows a glyph', find: 'if (!d) return null;', replace: 'return null;', tests: ['src/model/glyphs.test.ts', 'src/components/molecules/svg/svg.test.tsx'] },
+  { unit: 'glyphs.glyphFor (task corner)', file: 'src/model/glyphs.ts', what: 'task glyph centred instead of top-left', find: 'return { d, x: -size.width / 2 + TASK_INSET, y: -size.height / 2 + TASK_INSET, scale: 1 };', replace: 'return { d, x: -8, y: -8, scale: 1 };', tests: ['src/model/glyphs.test.ts'] },
   { unit: 'routing.autoSides', file: 'src/model/routing.ts', what: 'always horizontal', find: 'if (Math.abs(dx) > Math.abs(dy)) {', replace: 'if (true) {', tests: ['src/model/routing.test.ts'] },
   { unit: 'routing.orthogonalRoute', file: 'src/model/routing.ts', what: 'straight line instead of elbows', find: 'return simplify([from, p1, ...middle, p2, to]);', replace: 'return simplify([from, to]);', tests: ['src/model/routing.test.ts'] },
   { unit: 'routing.orthogonalRoute (fold-back fix)', file: 'src/model/routing.ts', what: 'zero-length segment kept', find: 'if (prev.x === p.x && prev.y === p.y) out.pop();', replace: ';', tests: ['src/model/routing.test.ts'] },
@@ -44,21 +55,26 @@ const MUTATIONS = [
   { unit: 'Checkbox', file: 'src/components/atoms/Checkbox.tsx', what: 'change not reported', find: 'onChange={(e) => props.onChange(e.currentTarget.checked)}', replace: 'onChange={() => undefined}', tests: ['src/components/atoms/atoms.test.tsx'] },
   { unit: 'Select', file: 'src/components/atoms/Select.tsx', what: 'value not selected', find: 'selected={option.value === props.value}', replace: 'selected={false}', tests: ['src/components/atoms/atoms.test.tsx'] },
   { unit: 'TextInput', file: 'src/components/atoms/TextInput.tsx', what: 'typing not reported', find: 'onInput={(e) => props.onInput(e.currentTarget.value)}', replace: 'onInput={() => undefined}', tests: ['src/components/atoms/atoms.test.tsx'] },
-  { unit: 'ShapeIcon', file: 'src/components/atoms/ShapeIcon.tsx', what: 'same icon for every shape', find: "shapePath(props.type, { width: 28, height: 16 })", replace: "shapePath('process', { width: 28, height: 16 })", tests: ['src/components/atoms/atoms.test.tsx'] },
+  { unit: 'ShapeIcon (outline)', file: 'src/components/atoms/ShapeIcon.tsx', what: 'same outline for every element', find: 'd={shapePath(props.type, size())}', replace: "d={shapePath('task', size())}", tests: ['src/components/atoms/atoms.test.tsx'] },
+  { unit: 'ShapeIcon (marks)', file: 'src/components/atoms/ShapeIcon.tsx', what: 'decorations missing', find: '<For each={decorations(props.type, variant(), size())}>', replace: '<For each={[]}>', tests: ['src/components/atoms/atoms.test.tsx'] },
   { unit: 'Muted', file: 'src/components/atoms/Muted.tsx', what: 'never hidden', find: 'hidden={props.hidden}', replace: 'hidden={false}', tests: ['src/components/atoms/atoms.test.tsx'] },
   { unit: 'Kbd', file: 'src/components/atoms/Kbd.tsx', what: 'not a kbd element', find: '<kbd class="kbd">{props.children}</kbd>', replace: '<span class="kbd">{props.children}</span>', tests: ['src/components/atoms/atoms.test.tsx'] },
   // Molecules
   { unit: 'Field', file: 'src/components/molecules/Field.tsx', what: 'never hidden', find: 'hidden={props.hidden}', replace: 'hidden={false}', tests: ['src/components/molecules/molecules.test.tsx'] },
   { unit: 'ToolButton', file: 'src/components/molecules/ToolButton.tsx', what: 'click not reported', find: 'onClick={() => props.onPick(props.type)}', replace: 'onClick={() => undefined}', tests: ['src/components/molecules/molecules.test.tsx'] },
-  { unit: 'ShapePicker', file: 'src/components/molecules/ShapePicker.tsx', what: 'one shape missing', find: '<For each={NODE_TYPES}>', replace: '<For each={NODE_TYPES.slice(0, 3)}>', tests: ['src/components/molecules/molecules.test.tsx'] },
+  { unit: 'ShapePicker', file: 'src/components/molecules/ShapePicker.tsx', what: 'one element missing per group', find: '<For each={typesInGroup(group)}>', replace: '<For each={typesInGroup(group).slice(1)}>', tests: ['src/components/molecules/molecules.test.tsx'] },
   { unit: 'NodeListItem', file: 'src/components/molecules/NodeListItem.tsx', what: 'never active', find: 'classList={{ active: props.active }}', replace: 'classList={{ active: false }}', tests: ['src/components/molecules/molecules.test.tsx'] },
   { unit: 'FileButton', file: 'src/components/molecules/FileButton.tsx', what: 'file not delivered and value not reset', find: "e.currentTarget.value = ''; // allows picking the same file again\n          if (file) props.onFile(file);", replace: ';', tests: ['src/components/molecules/molecules.test.tsx'] },
   { unit: 'FileButton (reset only)', file: 'src/components/molecules/FileButton.tsx', what: 'value not reset', find: "e.currentTarget.value = ''; // allows picking the same file again", replace: ';', tests: ['src/components/molecules/molecules.test.tsx'] },
   { unit: 'GridPattern', file: 'src/components/molecules/svg/GridPattern.tsx', what: 'does not follow the camera', find: 'patternTransform={props.transform}', replace: 'patternTransform="none"', tests: ['src/components/molecules/svg/svg.test.tsx'] },
-  { unit: 'ArrowMarkers', file: 'src/components/molecules/svg/ArrowMarkers.tsx', what: 'selected arrow not marked', find: 'classList={{ selected: props.selected }}', replace: 'classList={{ selected: false }}', tests: ['src/components/molecules/svg/svg.test.tsx'] },
-  { unit: 'NodeShape (measure)', file: 'src/components/molecules/svg/NodeShape.tsx', what: 'label not measured', find: 'shapeSize(currentType, textEl.getComputedTextLength())', replace: 'shapeSize(currentType, 0)', tests: ['src/components/molecules/svg/svg.test.tsx'] },
+  { unit: 'ArrowMarkers', file: 'src/components/molecules/svg/ArrowMarkers.tsx', what: 'selected twin not marked', find: 'classList={{ selected: props.selected }}', replace: 'classList={{ selected: false }}', tests: ['src/components/molecules/svg/svg.test.tsx'] },
+  { unit: 'NodeShape (measure)', file: 'src/components/molecules/svg/NodeShape.tsx', what: 'label not measured', find: 'const width = growsWithLabel(currentType) ? textEl.getComputedTextLength() : 0;', replace: 'const width = 0;', tests: ['src/components/molecules/svg/svg.test.tsx'] },
   { unit: 'NodeShape (ports)', file: 'src/components/molecules/svg/NodeShape.tsx', what: 'no side handles', find: '<For each={SIDES}>', replace: '<For each={[]}>', tests: ['src/components/molecules/svg/svg.test.tsx'] },
-  { unit: 'EdgePath', file: 'src/components/molecules/svg/EdgePath.tsx', what: 'no arrowhead', find: 'marker-end={marker()}', replace: 'marker-end={undefined}', tests: ['src/components/molecules/svg/svg.test.tsx'] },
+  { unit: 'NodeShape (label below)', file: 'src/components/molecules/svg/NodeShape.tsx', what: 'labels never drawn below', find: 'const labelY = () => (below() ? size().height / 2 + LABEL_BELOW_GAP : 0);', replace: 'const labelY = () => 0;', tests: ['src/components/molecules/svg/svg.test.tsx'] },
+  { unit: 'NodeShape (glyph)', file: 'src/components/molecules/svg/NodeShape.tsx', what: 'glyph never drawn', find: '<Show when={glyphFor(type(), variant(), size())}>', replace: '<Show when={null}>', tests: ['src/components/molecules/svg/svg.test.tsx'] },
+  { unit: 'EdgePath (arrowhead)', file: 'src/components/molecules/svg/EdgePath.tsx', what: 'no arrowhead', find: 'marker-end={markerEnd()}', replace: 'marker-end={undefined}', tests: ['src/components/molecules/svg/svg.test.tsx'] },
+  { unit: 'EdgePath (source marks)', file: 'src/components/molecules/svg/EdgePath.tsx', what: 'no default/conditional/message marks', find: 'marker-start={markerStart()}', replace: 'marker-start={undefined}', tests: ['src/components/molecules/svg/svg.test.tsx'] },
+  { unit: 'EdgePath (kind class)', file: 'src/components/molecules/svg/EdgePath.tsx', what: 'message flows not dashed', find: "'edge-message': kind() === 'message',", replace: "'edge-message': false,", tests: ['src/components/molecules/svg/svg.test.tsx'] },
   // Organisms
   { unit: 'GraphCanvas (modes)', file: 'src/components/organisms/GraphCanvas.tsx', what: 'mode classes missing', find: "classList={{ 'connect-mode': app.connectMode(), connecting: app.connecting() }}", replace: 'classList={{}}', tests: ['src/components/organisms/GraphCanvas.test.tsx'] },
   { unit: 'GraphCanvas (front node)', file: 'src/components/organisms/GraphCanvas.tsx', what: 'dragged node not brought to front', find: 'return [...list.slice(0, index), ...list.slice(index + 1), list[index]];', replace: 'return list;', tests: ['src/components/organisms/GraphCanvas.test.tsx'] },
@@ -77,9 +93,12 @@ const MUTATIONS = [
   { unit: 'InspectorPanel (typing step)', file: 'src/components/organisms/InspectorPanel.tsx', what: 'typing not grouped', find: 'app.history.begin();', replace: ';', tests: ['src/components/organisms/InspectorPanel.test.tsx'] },
   { unit: 'InspectorPanel (focus)', file: 'src/components/organisms/InspectorPanel.tsx', what: 'edit request does not focus', find: 'input.focus();\n        input.select();', replace: ';', tests: ['src/components/organisms/InspectorPanel.test.tsx'] },
   { unit: 'InspectorPanel (sides)', file: 'src/components/organisms/InspectorPanel.tsx', what: 'side change ignored', find: 'if (e) app.graph.setEdgeSide(e.id, end, isSide(value) ? value : undefined);', replace: ';', tests: ['src/components/organisms/InspectorPanel.test.tsx'] },
+  { unit: 'InspectorPanel (variant)', file: 'src/components/organisms/InspectorPanel.tsx', what: 'variant change ignored', find: 'if (n) app.graph.setNodeVariant(n.id, value);', replace: ';', tests: ['src/components/organisms/InspectorPanel.test.tsx'] },
+  { unit: 'InspectorPanel (kind)', file: 'src/components/organisms/InspectorPanel.tsx', what: 'kind change ignored', find: 'if (e && isEdgeKind(value)) app.graph.setEdgeKind(e.id, value);', replace: ';', tests: ['src/components/organisms/InspectorPanel.test.tsx'] },
+  { unit: 'InspectorPanel (condition field)', file: 'src/components/organisms/InspectorPanel.tsx', what: 'condition shown for every kind', find: "hidden={edge()?.kind !== 'sequence'}", replace: 'hidden={!edge()}', tests: ['src/components/organisms/InspectorPanel.test.tsx'] },
   { unit: 'NodeListPanel', file: 'src/components/organisms/NodeListPanel.tsx', what: 'row click does not reveal', find: 'app.revealNode(id);', replace: ';', tests: ['src/components/organisms/NodeListPanel.test.tsx'] },
   { unit: 'AppLayout', file: 'src/components/templates/AppLayout.tsx', what: 'tools panel missing', find: '<ToolsPanel />', replace: '', tests: ['src/App.test.tsx'] },
-  { unit: 'main (restore)', file: 'src/main.tsx', what: 'saved graph ignored', find: 'if (!loadSaved(graph)) seedExample(graph);', replace: 'seedExample(graph);', tests: ['src/main.test.tsx'] },
+  { unit: 'main (restore)', file: 'src/main.tsx', what: 'saved document ignored', find: 'if (!loadSaved(graph)) seedExample(graph);', replace: 'seedExample(graph);', tests: ['src/main.test.tsx'] },
   { unit: 'main (autosave)', file: 'src/main.tsx', what: 'changes never saved', find: 'localStorage.setItem(STORAGE_KEY, JSON.stringify(graph.toJSON()));', replace: ';', tests: ['src/main.test.tsx'] },
 ];
 

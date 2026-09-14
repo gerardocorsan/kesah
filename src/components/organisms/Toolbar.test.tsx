@@ -35,19 +35,14 @@ describe('Toolbar', () => {
     expect(status).toHaveTextContent('2 nodes · 1 edge');
   });
 
-  it('reflects and changes the directed and orthogonal settings', () => {
+  it('reflects and changes the orthogonal setting, and offers no directed switch (BPMN flows are always directed)', () => {
     const { container, graph } = renderWithApp(() => <Toolbar />);
-    const directed = container.querySelector('#chk-directed') as HTMLInputElement;
     const orthogonal = container.querySelector('#chk-orthogonal') as HTMLInputElement;
-    expect(directed.checked).toBe(true);
+    expect(container.querySelector('#chk-directed')).toBeNull();
     expect(orthogonal.checked).toBe(true);
-    fireEvent.click(directed);
-    expect(graph.directed).toBe(false);
     fireEvent.click(orthogonal);
     expect(graph.edgeStyle).toBe('straight');
-    graph.setDirected(true);
     graph.setEdgeStyle('orthogonal');
-    expect(directed.checked).toBe(true);
     expect(orthogonal.checked).toBe(true);
   });
 

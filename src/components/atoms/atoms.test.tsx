@@ -1,7 +1,7 @@
 import { fireEvent, render } from '@solidjs/testing-library';
 import { createSignal } from 'solid-js';
 import { describe, expect, it } from 'vitest';
-import { NODE_TYPES } from '../../model/graph';
+import { NODE_TYPES, type NodeType } from '../../model/graph';
 import { Button } from './Button';
 import { Checkbox } from './Checkbox';
 import { Kbd } from './Kbd';
@@ -159,23 +159,31 @@ describe('Kbd', () => {
 });
 
 describe('ShapeIcon', () => {
-  it('draws a distinct outline for every shape, hidden from assistive technology', () => {
-    const paths = NODE_TYPES.map((type) => {
+  it('draws a closed outline for every element, tagged with its type and hidden from assistive technology', () => {
+    for (const type of NODE_TYPES) {
       const { container } = render(() => <ShapeIcon type={type} />);
       const svg = container.querySelector('svg.shape-icon');
       expect(svg).toHaveAttribute('aria-hidden', 'true');
-      return svg?.querySelector('path')?.getAttribute('d') ?? '';
-    });
-    expect(new Set(paths).size).toBe(4);
-    expect(paths.every((d) => d.startsWith('M') && d.trim().endsWith('Z'))).toBe(true);
+      expect(svg).toHaveAttribute('data-type', type);
+      const d = svg?.querySelector('path.outline')?.getAttribute('d') ?? '';
+      expect(d.startsWith('M')).toBe(true);
+      expect(d.trim().endsWith('Z')).toBe(true);
+    }
   });
 
-  it('uses the flowchart geometry: rhombus for decisions, arcs for terminals, four straight sides for input/output', () => {
-    const d = (type: 'decision' | 'terminal' | 'io') => render(() => <ShapeIcon type={type} />).container.querySelector('path')?.getAttribute('d') ?? '';
-    expect(d('decision')).toMatch(/^M 0 -\d+ L \d+ 0 L 0 \d+ L -\d+ 0 Z$/);
-    expect(d('terminal')).toContain('A ');
-    expect(d('io')).not.toContain('A ');
-    expect(d('io').match(/L /g)).toHaveLength(3);
+  it('uses the BPMN geometry: circles for events, a rhombus for gateways, and the marks of each element', () => {
+    const icon = (type: NodeType, variant?: string) => render(() => <ShapeIcon type={type} variant={variant} />).container.querySelector('svg') as SVGSVGElement;
+    expect(icon('start-event').querySelector('path.outline')?.getAttribute('d')).toContain('A 18 18');
+    expect(icon('gateway').querySelector('path.outline')?.getAttribute('d')).toBe('M 0 -25 L 25 0 L 0 25 L -25 0 Z');
+    expect(icon('task').querySelector('path.outline')?.getAttribute('d')).toContain('A 10 10');
+    expect(icon('intermediate-event').querySelector('path.decoration.inner')).not.toBeNull();
+    expect(icon('end-event', 'terminate').querySelector('path.decoration.disc')).not.toBeNull();
+    expect(icon('subprocess').querySelector('path.decoration.marker')).not.toBeNull();
+    expect(icon('annotation').querySelector('path.decoration.bracket')).not.toBeNull();
+    expect(icon('data-object').querySelector('path.decoration.fold')).not.toBeNull();
+    expect(icon('gateway').querySelector('path.glyph')).not.toBeNull();
+    expect(icon('task').querySelector('path.glyph')).toBeNull();
+    expect(icon('task', 'user').querySelector('path.glyph')).not.toBeNull();
   });
 });
 

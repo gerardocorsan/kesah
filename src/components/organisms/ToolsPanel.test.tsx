@@ -18,24 +18,24 @@ describe('ToolsPanel', () => {
     const { container, app, graph } = renderWithApp(() => <ToolsPanel />);
     canvas(app);
     const requests = app.editRequest();
-    fireEvent.click(container.querySelector('#add-node-tools button[data-type="decision"]') as HTMLButtonElement);
+    fireEvent.click(container.querySelector('#add-node-tools button[data-type="gateway"]') as HTMLButtonElement);
     expect(graph.nodeCount).toBe(1);
     const node = graph.nodeList[0];
-    expect(node).toMatchObject({ type: 'decision', x: 400, y: 300 });
+    expect(node).toMatchObject({ type: 'gateway', variant: 'exclusive', x: 400, y: 300 });
     expect(app.selection()).toEqual({ kind: 'node', id: node.id });
     expect(app.editRequest()).toBe(requests + 1);
   });
 
-  it('offers every shape and places a second node somewhere free', () => {
+  it('offers every element and places a second node somewhere free', () => {
     const { container, app, graph } = renderWithApp(() => <ToolsPanel />);
     canvas(app);
     const buttons = [...container.querySelectorAll('#add-node-tools button')];
-    expect(buttons.map((b) => b.getAttribute('data-type'))).toEqual(['terminal', 'process', 'decision', 'io']);
+    expect(buttons.map((b) => b.getAttribute('data-type'))).toEqual(['start-event', 'intermediate-event', 'end-event', 'task', 'subprocess', 'gateway', 'annotation', 'data-object']);
     fireEvent.click(buttons[0]);
     fireEvent.click(buttons[0]);
     const [first, second] = graph.nodeList;
-    const { width, height } = shapeSize('terminal', 0);
-    expect(second.type).toBe('terminal');
+    const { width, height } = shapeSize('start-event', 0);
+    expect(second.type).toBe('start-event');
     expect(Math.abs(first.x - second.x) >= width || Math.abs(first.y - second.y) >= height).toBe(true);
   });
 
