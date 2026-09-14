@@ -4,6 +4,7 @@ import { useApp } from '../../state/app';
 import { Button } from '../atoms/Button';
 import { Muted } from '../atoms/Muted';
 import { Select } from '../atoms/Select';
+import { TextArea } from '../atoms/TextArea';
 import { TextInput } from '../atoms/TextInput';
 import { Field } from '../molecules/Field';
 import { CONDITION_OPTIONS, EDGE_KIND_OPTIONS, NODE_TYPE_OPTIONS, SIDE_OPTIONS, VARIANT_FIELD_LABEL, variantOptions } from '../labels';
@@ -78,6 +79,35 @@ export function InspectorPanel() {
     if (e) app.graph.setEdgeSide(e.id, end, isSide(value) ? value : undefined);
   };
 
+  // Execution properties, read by the server: which ones apply depends on the element.
+  const isEvent = (type: string) => type === 'start-event' || type === 'intermediate-event' || type === 'end-event';
+  const hasScript = () => {
+    const n = node();
+    return n !== undefined && (n.type === 'task' || n.type === 'subprocess');
+  };
+  const hasDelay = () => {
+    const n = node();
+    return n !== undefined && isEvent(n.type) && n.variant === 'timer';
+  };
+  const hasMessage = () => {
+    const n = node();
+    return n !== undefined && isEvent(n.type) && n.variant === 'message';
+  };
+  const hasExpression = () => edge()?.kind === 'sequence';
+  // The delay field shows what is being typed while focused, so a half-typed number is not wiped.
+  const [delayDraft, setDelayDraft] = createSignal<string | null>(null);
+  const shownDelay = () => delayDraft() ?? (node()?.delay === undefined ? '' : String(node()?.delay));
+  const applyDelay = (value: string): void => {
+    const n = node();
+    if (!n) return;
+    const trimmed = value.trim();
+    app.graph.setNodeDelay(n.id, trimmed === '' ? undefined : Number(trimmed));
+  };
+  createEffect(on(app.selection, () => setDelayDraft(null)));
+  // Everything typed into a field until it loses focus is one undo step.
+  const beginStep = () => app.history.begin();
+  const endStep = () => app.history.commit();
+
   return (
     <section class="panel">
       <h2 id="inspector-title">{title()}</h2>
@@ -136,6 +166,49 @@ export function InspectorPanel() {
             }}
           />
         </Field>
+        <Field id="script-field" label="Script" hidden={!hasScript()}>
+          <TextArea
+            id="inp-script"
+            value={node()?.script ?? ''}
+            placeholder="vars.total = vars.price * vars.qty;"
+            onFocus={beginStep}
+            onBlur={endStep}
+            onInput={(value) => {
+              const n = node();
+              if (n) app.graph.setNodeScript(n.id, value);
+            }}
+          />
+        </Field>
+        <Field id="delay-field" label="Delay (ms)" hidden={!hasDelay()}>
+          <TextInput
+            id="inp-delay"
+            value={shownDelay()}
+            onFocus={() => {
+              setDelayDraft(shownDelay());
+              beginStep();
+            }}
+            onInput={(value) => {
+              setDelayDraft(value);
+              applyDelay(value);
+            }}
+            onBlur={() => {
+              setDelayDraft(null);
+              endStep();
+            }}
+          />
+        </Field>
+        <Field id="message-field" label="Message" hidden={!hasMessage()}>
+          <TextInput
+            id="inp-message"
+            value={node()?.message ?? ''}
+            onFocus={beginStep}
+            onBlur={endStep}
+            onInput={(value) => {
+              const n = node();
+              if (n) app.graph.setNodeMessage(n.id, value);
+            }}
+          />
+        </Field>
         <Field id="kind-field" label="Kind" hidden={!edge()}>
           <Select
             id="sel-kind"
@@ -155,6 +228,18 @@ export function InspectorPanel() {
             onChange={(value) => {
               const e = edge();
               if (e && isFlowCondition(value)) app.graph.setEdgeCondition(e.id, value);
+            }}
+          />
+        </Field>
+        <Field id="expression-field" label="Expression" hidden={!hasExpression()}>
+          <TextInput
+            id="inp-expression"
+            value={edge()?.expression ?? ''}
+            onFocus={beginStep}
+            onBlur={endStep}
+            onInput={(value) => {
+              const e = edge();
+              if (e) app.graph.setEdgeExpression(e.id, value);
             }}
           />
         </Field>

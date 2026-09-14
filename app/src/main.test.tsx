@@ -45,6 +45,7 @@ describe('main', () => {
     expect(count('.edge-line[marker-start="url(#flow-conditional)"]')).toBe(1);
     expect((document.querySelector('#chk-orthogonal') as HTMLInputElement).checked).toBe(true);
     expect(document.title).toBe('');
+
   });
 
   it('restores the document saved in the browser, mapping old flowchart files onto BPMN elements', async () => {
@@ -90,6 +91,13 @@ describe('main', () => {
     expect(saved.edges).toHaveLength(7);
     expect(saved.edgeStyle).toBe('orthogonal');
     expect(saved.nodes[8]).toMatchObject({ type: 'start-event', variant: 'none' });
+    // The sample is executable as it is: the gateway decides on a variable and the branches leave a trace.
+    const nodes = saved.nodes as { label: string; script?: string; message?: string }[];
+    const edges = saved.edges as { label: string; expression?: string }[];
+    expect(edges.find((e) => e.label === 'yes')?.expression).toBe('vars.stock');
+    expect(nodes.find((n) => n.label === 'Ship order')?.script).toMatch(/vars\.item/);
+    expect(nodes.find((n) => n.label === 'Notify customer')?.script).toMatch(/vars\.notified/);
+    expect(nodes.find((n) => n.label === 'Order rejected')?.message).toBe('rejected');
     expect(saved.edges.every((e: { kind: string }) => typeof e.kind === 'string')).toBe(true);
   });
 });

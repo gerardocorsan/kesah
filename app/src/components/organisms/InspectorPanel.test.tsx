@@ -7,7 +7,9 @@ import { InspectorPanel } from './InspectorPanel';
  * Agreed behaviour: the panel shows the selected element's properties; an empty node name is
  * never applied; Enter and Escape leave the name field; typing a name is one undo step; nodes
  * expose their type and, when the type has any, a variant; edges expose kind, condition (for
- * sequence flows), and "From side" / "To side" with an Auto option.
+ * sequence flows), and "From side" / "To side" with an Auto option. Execution properties: Script
+ * for tasks and sub-processes, Delay (ms) for timer events, Message for message events, Expression
+ * for sequence flows; each is one undo step per focus and disappears from the document when blank.
  */
 
 function setup() {
@@ -39,6 +41,8 @@ function setup() {
     deleteButton: () => q<HTMLButtonElement>('#btn-delete'),
     type: (value: string) => fireEvent.input(q('#inp-label'), { target: { value } }),
     choose: (selector: string, value: string) => fireEvent.change(q(selector), { target: { value } }),
+    typeInto: (selector: string, value: string) => fireEvent.input(q(selector), { target: { value } }),
+    field: <T extends HTMLElement>(selector: string) => q<T>(selector),
   };
 }
 
@@ -180,6 +184,114 @@ describe('InspectorPanel with a node selected', () => {
     s.type('Alpha');
     s.app.select({ kind: 'edge', id: s.ids.edge });
     expect(s.input().value).toBe('Yes');
+  });
+});
+
+describe('InspectorPanel execution properties', () => {
+  const executionFields = ['#script-field', '#delay-field', '#message-field', '#expression-field'];
+
+  it('shows the script only for tasks and sub-processes and stores it on the node', () => {
+    const s = setup();
+    s.app.select({ kind: 'node', id: s.ids.a });
+    expect(s.hidden('#script-field')).toBe(false);
+    for (const field of ['#delay-field', '#message-field', '#expression-field']) expect(s.hidden(field)).toBe(true);
+    expect(s.field<HTMLTextAreaElement>('#inp-script').value).toBe('');
+    s.typeInto('#inp-script', 'vars.total = 2;');
+    expect(s.graph.getNode(s.ids.a)?.script).toBe('vars.total = 2;');
+    s.typeInto('#inp-script', '');
+    expect(s.graph.getNode(s.ids.a)).not.toHaveProperty('script');
+    s.choose('#sel-type', 'subprocess');
+    expect(s.hidden('#script-field')).toBe(false);
+    s.choose('#sel-type', 'gateway');
+    expect(s.hidden('#script-field')).toBe(true);
+    s.app.select({ kind: 'node', id: s.ids.b });
+    expect(s.hidden('#script-field')).toBe(true);
+  });
+
+  it('shows the delay only for timer events and stores a number, clearing it when the text is not one', () => {
+    const s = setup();
+    s.app.select({ kind: 'node', id: s.ids.a });
+    s.choose('#sel-type', 'start-event');
+    expect(s.hidden('#delay-field')).toBe(true);
+    s.choose('#sel-variant', 'timer');
+    expect(s.hidden('#delay-field')).toBe(false);
+    expect(s.hidden('#message-field')).toBe(true);
+    expect(s.hidden('#script-field')).toBe(true);
+    const delay = s.field<HTMLInputElement>('#inp-delay');
+    fireEvent.focus(delay);
+    s.typeInto('#inp-delay', '25');
+    expect(s.graph.getNode(s.ids.a)?.delay).toBe(25);
+    s.typeInto('#inp-delay', '25x');
+    expect(s.graph.getNode(s.ids.a)).not.toHaveProperty('delay');
+    expect(delay.value).toBe('25x');
+    s.typeInto('#inp-delay', '250');
+    fireEvent.blur(delay);
+    expect(delay.value).toBe('250');
+    s.choose('#sel-variant', 'message');
+    expect(s.hidden('#delay-field')).toBe(true);
+    expect(s.hidden('#message-field')).toBe(false);
+    s.typeInto('#inp-message', 'order paid');
+    expect(s.graph.getNode(s.ids.a)?.message).toBe('order paid');
+    s.choose('#sel-type', 'intermediate-event');
+    expect(s.hidden('#message-field')).toBe(false);
+    expect(s.field<HTMLInputElement>('#inp-message').value).toBe('order paid');
+  });
+
+  it('shows the delay and the message stored on the node when it is selected', () => {
+    const s = setup();
+    const timer = s.graph.addNode(0, 200, 'T', 'intermediate-event', 'message');
+    s.graph.setNodeMessage(timer.id, 'done');
+    s.graph.setNodeDelay(timer.id, 40);
+    s.app.select({ kind: 'node', id: timer.id });
+    expect(s.field<HTMLInputElement>('#inp-message').value).toBe('done');
+    expect(s.hidden('#delay-field')).toBe(true);
+    s.graph.setNodeVariant(timer.id, 'timer');
+    expect(s.hidden('#delay-field')).toBe(false);
+    expect(s.field<HTMLInputElement>('#inp-delay').value).toBe('40');
+  });
+
+  it('shows the expression only for sequence flows and stores it on the edge', () => {
+    const s = setup();
+    s.app.select({ kind: 'edge', id: s.ids.edge });
+    expect(s.hidden('#expression-field')).toBe(false);
+    for (const field of ['#script-field', '#delay-field', '#message-field']) expect(s.hidden(field)).toBe(true);
+    s.typeInto('#inp-expression', 'vars.stock');
+    expect(s.graph.getEdge(s.ids.edge)?.expression).toBe('vars.stock');
+    s.choose('#sel-kind', 'association');
+    expect(s.hidden('#expression-field')).toBe(true);
+    expect(s.graph.getEdge(s.ids.edge)).not.toHaveProperty('expression');
+    s.choose('#sel-kind', 'sequence');
+    expect(s.field<HTMLInputElement>('#inp-expression').value).toBe('');
+  });
+
+  it('hides every execution field when nothing is selected', () => {
+    const s = setup();
+    for (const field of executionFields) expect(s.hidden(field)).toBe(true);
+  });
+
+  it('groups what is typed into a field between focus and blur as one undo step', () => {
+    const s = setup();
+    s.app.select({ kind: 'node', id: s.ids.a });
+    const script = s.field<HTMLTextAreaElement>('#inp-script');
+    fireEvent.focus(script);
+    s.typeInto('#inp-script', 'a');
+    s.typeInto('#inp-script', 'ab');
+    s.typeInto('#inp-script', 'abc');
+    fireEvent.blur(script);
+    expect(s.graph.getNode(s.ids.a)?.script).toBe('abc');
+    s.app.undo();
+    expect(s.graph.getNode(s.ids.a)).not.toHaveProperty('script');
+    s.app.redo();
+    expect(s.graph.getNode(s.ids.a)?.script).toBe('abc');
+
+    s.app.select({ kind: 'edge', id: s.ids.edge });
+    const expression = s.field<HTMLInputElement>('#inp-expression');
+    fireEvent.focus(expression);
+    s.typeInto('#inp-expression', 'x');
+    s.typeInto('#inp-expression', 'xy');
+    fireEvent.blur(expression);
+    s.app.undo();
+    expect(s.graph.getEdge(s.ids.edge)).not.toHaveProperty('expression');
   });
 });
 

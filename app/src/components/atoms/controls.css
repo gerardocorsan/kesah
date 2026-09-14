@@ -18,3 +18,12 @@
   outline: 2px solid var(--accent-soft);
   border-color: var(--accent);
 }
+
+.control-code {
+  font-family: ui-monospace, 'Cascadia Mono', 'Fira Code', Menlo, Consolas, monospace;
+  font-size: 0.85em;
+  resize: vertical;
+  min-height: 3.5em;
+  width: 100%;
+  box-sizing: border-box;
+}

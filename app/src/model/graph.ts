@@ -101,6 +101,12 @@ export interface GraphNode {
   variant: string;
   x: number;
   y: number;
+  /** Rhai script the engine runs when a token reaches a task or sub-process. Absent when empty. */
+  script?: string;
+  /** Milliseconds a timer event waits. Absent when unset. */
+  delay?: number;
+  /** Name a message event waits for, or sends when it is an end event. Absent when empty. */
+  message?: string;
 }
 
 export interface GraphEdge {
@@ -115,6 +121,8 @@ export interface GraphEdge {
   sourceSide?: Side;
   /** Side of the target node the edge enters through; chosen automatically when absent. */
   targetSide?: Side;
+  /** Rhai boolean expression a gateway evaluates before taking this sequence flow. Absent when empty. */
+  expression?: string;
 }
 
 export interface EdgeOptions {
@@ -269,6 +277,27 @@ export class Graph {
     this.emit();
   }
 
+  /** Sets the script of the node; an empty or blank script removes the field. */
+  setNodeScript(id: NodeId, script: string | undefined): void {
+    this.setOptionalText(this.nodes.get(id), 'script', script);
+  }
+
+  /** Sets the delay in milliseconds; anything that is not a finite non-negative number removes the field. */
+  setNodeDelay(id: NodeId, delay: number | undefined): void {
+    const node = this.nodes.get(id);
+    if (!node) return;
+    const next = isFiniteNumber(delay) && delay >= 0 ? delay : undefined;
+    if (node.delay === next) return;
+    if (next === undefined) delete node.delay;
+    else node.delay = next;
+    this.emit();
+  }
+
+  /** Sets the message name of the node; an empty or blank name removes the field. */
+  setNodeMessage(id: NodeId, message: string | undefined): void {
+    this.setOptionalText(this.nodes.get(id), 'message', message);
+  }
+
   /** Removes the node together with every edge that touches it. */
   removeNode(id: NodeId): void {
     if (!this.nodes.delete(id)) return;
@@ -320,12 +349,15 @@ export class Graph {
     this.emit();
   }
 
-  /** Changes the connection kind. Leaving the sequence kind drops the flow condition. */
+  /** Changes the connection kind. Leaving the sequence kind drops the flow condition and the expression. */
   setEdgeKind(id: EdgeId, kind: EdgeKind): void {
     const edge = this.edges.get(id);
     if (!edge || edge.kind === kind) return;
     edge.kind = kind;
-    if (kind !== 'sequence') edge.condition = 'none';
+    if (kind !== 'sequence') {
+      edge.condition = 'none';
+      delete edge.expression;
+    }
     this.emit();
   }
 
@@ -346,6 +378,11 @@ export class Graph {
     if (side) edge[key] = side;
     else delete edge[key];
     this.emit();
+  }
+
+  /** Sets the expression of the edge; an empty or blank expression removes the field. */
+  setEdgeExpression(id: EdgeId, expression: string | undefined): void {
+    this.setOptionalText(this.edges.get(id), 'expression', expression);
   }
 
   removeEdge(id: EdgeId): void {
@@ -389,8 +426,9 @@ export class Graph {
    * edges pointing at missing nodes. Flowchart-era types are mapped onto BPMN
    * elements, unknown types and variants take defaults, a missing edge kind is
    * a sequence flow, and a missing edge style means straight lines, so files
-   * written before those fields existed still load. Throws if the basic
-   * shape is wrong.
+   * written before those fields existed still load. The execution fields
+   * (`script`, `delay`, `message`, `expression`) are copied only when valid.
+   * Throws if the basic shape is wrong.
    */
   static parse(value: unknown): GraphData {
     if (!isRecord(value) || !Array.isArray(value.nodes) || !Array.isArray(value.edges)) {
@@ -404,14 +442,18 @@ export class Graph {
       if (!isFiniteNumber(raw.x) || !isFiniteNumber(raw.y)) continue;
       nodeIds.add(raw.id);
       const type = resolveNodeType(raw.type);
-      nodes.push({
+      const node: GraphNode = {
         id: raw.id,
         label: typeof raw.label === 'string' ? raw.label : raw.id,
         type,
         variant: isVariantOf(type, raw.variant) ? raw.variant : defaultVariant(type),
         x: raw.x,
         y: raw.y,
-      });
+      };
+      if (typeof raw.script === 'string' && raw.script.trim() !== '') node.script = raw.script;
+      if (isFiniteNumber(raw.delay) && raw.delay >= 0) node.delay = raw.delay;
+      if (typeof raw.message === 'string' && raw.message.trim() !== '') node.message = raw.message;
+      nodes.push(node);
     }
 
     const edges: GraphEdge[] = [];
@@ -432,6 +474,7 @@ export class Graph {
       };
       if (isSide(raw.sourceSide)) edge.sourceSide = raw.sourceSide;
       if (isSide(raw.targetSide)) edge.targetSide = raw.targetSide;
+      if (kind === 'sequence' && typeof raw.expression === 'string' && raw.expression.trim() !== '') edge.expression = raw.expression;
       edges.push(edge);
     }
 
@@ -441,6 +484,20 @@ export class Graph {
       nodes,
       edges,
     };
+  }
+
+  /** Stores a trimmed text in an optional field, dropping the field when the text is blank. */
+  private setOptionalText<T extends { script?: string; message?: string; expression?: string }>(
+    target: T | undefined,
+    key: 'script' | 'message' | 'expression',
+    value: string | undefined,
+  ): void {
+    if (!target) return;
+    const next = typeof value === 'string' && value.trim() !== '' ? value : undefined;
+    if (target[key] === next) return;
+    if (next === undefined) delete target[key];
+    else target[key] = next;
+    this.emit();
   }
 
   private emit(): void {

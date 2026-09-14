@@ -28,9 +28,14 @@ function seedExample(graph: Graph): void {
   const notify = graph.addNode(540, 290, 'Notify customer', 'task');
   const rejected = graph.addNode(700, 290, 'Order rejected', 'end-event', 'message');
   const note = graph.addNode(370, 50, 'Checked daily', 'annotation');
+  // Execution properties, so the sample can be deployed to the server as it is.
+  graph.setNodeScript(ship.id, 'log("shipping " + vars.item);');
+  graph.setNodeScript(notify.id, 'vars.notified = true;');
+  graph.setNodeMessage(rejected.id, 'rejected');
   graph.addEdge(start.id, receive.id, '', { sourceSide: 'right', targetSide: 'left' });
   graph.addEdge(receive.id, inStock.id, '', { sourceSide: 'right', targetSide: 'left' });
-  graph.addEdge(inStock.id, ship.id, 'yes', { sourceSide: 'right', targetSide: 'left', condition: 'conditional' });
+  const yes = graph.addEdge(inStock.id, ship.id, 'yes', { sourceSide: 'right', targetSide: 'left', condition: 'conditional' });
+  if (yes) graph.setEdgeExpression(yes.id, 'vars.stock');
   graph.addEdge(inStock.id, notify.id, 'no', { sourceSide: 'bottom', targetSide: 'left', condition: 'default' });
   graph.addEdge(ship.id, end.id, '', { sourceSide: 'right', targetSide: 'left' });
   graph.addEdge(notify.id, rejected.id, '', { sourceSide: 'right', targetSide: 'left' });

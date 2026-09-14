@@ -8,6 +8,7 @@ import { Kbd } from './Kbd';
 import { Muted } from './Muted';
 import { Select } from './Select';
 import { ShapeIcon } from './ShapeIcon';
+import { TextArea } from './TextArea';
 import { TextInput } from './TextInput';
 
 describe('Button', () => {
@@ -120,6 +121,43 @@ describe('TextInput', () => {
     fireEvent.keyDown(input, { key: 'Enter' });
     fireEvent.blur(input);
     expect(events).toEqual(['focus', 'key:Enter', 'blur']);
+  });
+});
+
+describe('TextArea', () => {
+  it('shows the value in a multi-line field, reports what is typed, focus and blur', () => {
+    const typed: string[] = [];
+    const events: string[] = [];
+    const [value, setValue] = createSignal('log(1);');
+    const { getByRole } = render(() => (
+      <TextArea
+        id="code"
+        rows={6}
+        placeholder="vars.x = 1;"
+        value={value()}
+        onInput={(v) => typed.push(v)}
+        onFocus={() => events.push('focus')}
+        onBlur={() => events.push('blur')}
+      />
+    ));
+    const area = getByRole('textbox') as HTMLTextAreaElement;
+    expect(area.tagName).toBe('TEXTAREA');
+    expect(area.id).toBe('code');
+    expect(area.rows).toBe(6);
+    expect(area.placeholder).toBe('vars.x = 1;');
+    expect(area.value).toBe('log(1);');
+    fireEvent.input(area, { target: { value: 'log(2);\nlog(3);' } });
+    expect(typed).toEqual(['log(2);\nlog(3);']);
+    setValue('other');
+    expect(area.value).toBe('other');
+    fireEvent.focus(area);
+    fireEvent.blur(area);
+    expect(events).toEqual(['focus', 'blur']);
+  });
+
+  it('defaults to a few rows', () => {
+    const { getByRole } = render(() => <TextArea value="" onInput={() => undefined} />);
+    expect((getByRole('textbox') as HTMLTextAreaElement).rows).toBeGreaterThanOrEqual(2);
   });
 });
 

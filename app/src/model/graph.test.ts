@@ -389,6 +389,110 @@ describe('JSON export and import', () => {
   });
 });
 
+describe('Execution properties (read by the server)', () => {
+  it('stores a script on a node and drops the field when it is blank', () => {
+    const { graph, a } = twoNodes();
+    let calls = 0;
+    graph.onChange(() => calls++);
+    graph.setNodeScript(a, 'vars.total = 1;');
+    expect(graph.getNode(a)?.script).toBe('vars.total = 1;');
+    expect(calls).toBe(1);
+    graph.setNodeScript(a, 'vars.total = 1;');
+    expect(calls).toBe(1);
+    graph.setNodeScript(a, '   ');
+    expect(graph.getNode(a)).not.toHaveProperty('script');
+    expect(calls).toBe(2);
+    graph.setNodeScript(a, undefined);
+    expect(calls).toBe(2);
+    graph.setNodeScript('missing', 'x');
+    expect(calls).toBe(2);
+  });
+
+  it('stores a message name on a node and drops the field when it is blank', () => {
+    const { graph, a } = twoNodes();
+    graph.setNodeMessage(a, 'paid');
+    expect(graph.getNode(a)?.message).toBe('paid');
+    graph.setNodeMessage(a, '');
+    expect(graph.getNode(a)).not.toHaveProperty('message');
+  });
+
+  it('stores a non-negative finite delay and drops anything else', () => {
+    const { graph, a } = twoNodes();
+    let calls = 0;
+    graph.onChange(() => calls++);
+    graph.setNodeDelay(a, 500);
+    expect(graph.getNode(a)?.delay).toBe(500);
+    expect(calls).toBe(1);
+    graph.setNodeDelay(a, 500);
+    expect(calls).toBe(1);
+    graph.setNodeDelay(a, 0);
+    expect(graph.getNode(a)?.delay).toBe(0);
+    for (const bad of [-1, Number.NaN, Number.POSITIVE_INFINITY, undefined]) {
+      graph.setNodeDelay(a, 250);
+      graph.setNodeDelay(a, bad);
+      expect(graph.getNode(a)).not.toHaveProperty('delay');
+    }
+    graph.setNodeDelay('missing', 1);
+    expect(graph.getNode(a)).not.toHaveProperty('delay');
+  });
+
+  it('stores an expression on an edge and drops it when blank or when the edge stops being a sequence flow', () => {
+    const { graph, a, b } = twoNodes();
+    const edge = graph.addEdge(a, b);
+    if (!edge) throw new Error('edge expected');
+    graph.setEdgeExpression(edge.id, 'vars.total > 100');
+    expect(graph.getEdge(edge.id)?.expression).toBe('vars.total > 100');
+    graph.setEdgeExpression(edge.id, ' ');
+    expect(graph.getEdge(edge.id)).not.toHaveProperty('expression');
+    graph.setEdgeExpression(edge.id, 'vars.ok');
+    graph.setEdgeKind(edge.id, 'message');
+    expect(graph.getEdge(edge.id)).not.toHaveProperty('expression');
+    graph.setEdgeExpression('missing', 'x');
+    expect(graph.edgeList.filter((e) => e.expression !== undefined)).toEqual([]);
+  });
+
+  it('exports the fields only when set and imports the valid ones', () => {
+    const { graph, a, b } = twoNodes();
+    const edge = graph.addEdge(a, b);
+    if (!edge) throw new Error('edge expected');
+    graph.setNodeType(a, 'start-event');
+    graph.setNodeVariant(a, 'timer');
+    graph.setNodeDelay(a, 1500);
+    graph.setNodeScript(b, 'log("hi");');
+    graph.setNodeMessage(b, 'done');
+    graph.setEdgeExpression(edge.id, 'true');
+    const data = graph.toJSON();
+    expect(data.nodes[0]).toEqual({ id: 'n1', label: 'A', type: 'start-event', variant: 'timer', x: 0, y: 0, delay: 1500 });
+    expect(data.nodes[1]).toMatchObject({ script: 'log("hi");', message: 'done' });
+    expect(data.nodes[1]).not.toHaveProperty('delay');
+    expect(data.edges[0]).toMatchObject({ expression: 'true' });
+    const copy = new Graph();
+    copy.load(Graph.parse(JSON.parse(JSON.stringify(data))));
+    expect(copy.toJSON()).toEqual(data);
+  });
+
+  it('parse ignores blank, mistyped or negative execution fields and expressions on non-sequence edges', () => {
+    const data = Graph.parse({
+      nodes: [
+        { id: 'a', x: 0, y: 0, script: '  ', delay: -5, message: 7 },
+        { id: 'b', x: 0, y: 0, script: 5, delay: 'soon', message: '' },
+        { id: 'c', x: 0, y: 0, script: 'log(1);', delay: 0, message: 'go' },
+      ],
+      edges: [
+        { id: 'e1', source: 'a', target: 'b', expression: 'true', kind: 'message' },
+        { id: 'e2', source: 'a', target: 'c', expression: 'vars.x' },
+        { id: 'e3', source: 'b', target: 'c', expression: '' },
+      ],
+    });
+    expect(data.nodes[0]).toEqual({ id: 'a', label: 'a', type: 'task', variant: 'none', x: 0, y: 0 });
+    expect(data.nodes[1]).toEqual({ id: 'b', label: 'b', type: 'task', variant: 'none', x: 0, y: 0 });
+    expect(data.nodes[2]).toMatchObject({ script: 'log(1);', delay: 0, message: 'go' });
+    expect(data.edges[0]).not.toHaveProperty('expression');
+    expect(data.edges[1].expression).toBe('vars.x');
+    expect(data.edges[2]).not.toHaveProperty('expression');
+  });
+});
+
 describe('Graph.parse validation', () => {
   it('rejects anything that is not an object with nodes and edges arrays', () => {
     expect(() => Graph.parse(null)).toThrow(/nodes/);
