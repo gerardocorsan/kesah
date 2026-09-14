@@ -5,3 +5,4 @@ tmp
 .claude
 app/e2e/last-run.png
 target
+mutants.out*

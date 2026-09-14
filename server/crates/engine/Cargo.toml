@@ -1,0 +1,10 @@
+[package]
+name = "engine"
+description = "Token-based interpreter for Kesah BPMN documents: pure, no I/O, no clock"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+rhai = { version = "1", features = ["serde"] }
