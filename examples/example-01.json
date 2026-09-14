@@ -1,0 +1,140 @@
+{
+  "directed": true,
+  "edgeStyle": "orthogonal",
+  "nodes": [
+    {
+      "id": "n1",
+      "label": "Start",
+      "type": "start-event",
+      "variant": "none",
+      "x": 38.3026123046875,
+      "y": -45.8629150390625
+    },
+    {
+      "id": "n2",
+      "label": "Read input",
+      "type": "data-object",
+      "variant": "none",
+      "x": 38.4871826171875,
+      "y": 55.36219787597656
+    },
+    {
+      "id": "n3",
+      "label": "Valid?",
+      "type": "gateway",
+      "variant": "exclusive",
+      "x": 39.499267578125,
+      "y": 251.4879150390625
+    },
+    {
+      "id": "n4",
+      "label": "Process data",
+      "type": "task",
+      "variant": "none",
+      "x": -260.7776794433594,
+      "y": 371.4027099609375
+    },
+    {
+      "id": "n5",
+      "label": "Show error",
+      "type": "task",
+      "variant": "none",
+      "x": 345.7990722656249,
+      "y": 383.08953857421875
+    },
+    {
+      "id": "n6",
+      "label": "End",
+      "type": "start-event",
+      "variant": "none",
+      "x": 42.52130126953125,
+      "y": 507.233642578125
+    },
+    {
+      "id": "n7",
+      "label": "gfdgfsdgds",
+      "type": "task",
+      "variant": "none",
+      "x": -320.7165985107422,
+      "y": 41.48329162597656
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "n1",
+      "target": "n2",
+      "label": "",
+      "kind": "sequence",
+      "condition": "none",
+      "sourceSide": "bottom",
+      "targetSide": "top"
+    },
+    {
+      "id": "e2",
+      "source": "n2",
+      "target": "n3",
+      "label": "",
+      "kind": "sequence",
+      "condition": "none",
+      "sourceSide": "bottom",
+      "targetSide": "top"
+    },
+    {
+      "id": "e3",
+      "source": "n3",
+      "target": "n4",
+      "label": "Yes",
+      "kind": "sequence",
+      "condition": "none",
+      "sourceSide": "left",
+      "targetSide": "top"
+    },
+    {
+      "id": "e4",
+      "source": "n3",
+      "target": "n5",
+      "label": "No",
+      "kind": "sequence",
+      "condition": "none",
+      "sourceSide": "right",
+      "targetSide": "top"
+    },
+    {
+      "id": "e5",
+      "source": "n4",
+      "target": "n6",
+      "label": "",
+      "kind": "sequence",
+      "condition": "none",
+      "sourceSide": "bottom",
+      "targetSide": "left"
+    },
+    {
+      "id": "e6",
+      "source": "n5",
+      "target": "n6",
+      "label": "",
+      "kind": "sequence",
+      "condition": "none",
+      "sourceSide": "bottom",
+      "targetSide": "right"
+    },
+    {
+      "id": "e7",
+      "source": "n2",
+      "target": "n7",
+      "label": "",
+      "kind": "sequence",
+      "condition": "none"
+    },
+    {
+      "id": "e8",
+      "source": "n7",
+      "target": "n4",
+      "label": "",
+      "kind": "sequence",
+      "condition": "none"
+    }
+  ]
+}
