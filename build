@@ -1,0 +1,18 @@
+#!/bin/bash
+# Builds the whole project: the web application into app/dist/ and the API
+# server as an optimised binary in server/target/release/api.
+# Installs the npm dependencies when app/node_modules is missing.
+set -e
+root="$(cd "$(dirname "$0")" && pwd)"
+
+echo "== app"
+cd "$root/app"
+[ -d node_modules ] || npm install
+npm run build
+
+echo "== server"
+cd "$root/server"
+cargo build --release -p api
+
+echo
+echo "Built: app/dist/ and server/target/release/api"
