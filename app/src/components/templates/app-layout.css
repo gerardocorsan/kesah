@@ -9,7 +9,8 @@
   width: var(--sidebar-width);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  /* The panels stack; when they outgrow the window the whole sidebar scrolls. */
+  overflow-y: auto;
   background: var(--panel);
   border-right: 1px solid var(--border);
 }

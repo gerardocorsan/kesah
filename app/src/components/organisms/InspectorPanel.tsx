@@ -14,6 +14,7 @@ import './panel.css';
 export function InspectorPanel() {
   const app = useApp();
   let input!: HTMLInputElement;
+  let section!: HTMLElement;
 
   // Plain accessors rather than memos: the graph mutates objects in place, so every
   // consumer must re-read the fields whenever the revision changes.
@@ -62,6 +63,16 @@ export function InspectorPanel() {
     }
   };
   createEffect(on(app.selection, () => setDraft(null)));
+  // The sidebar scrolls; a fresh selection brings its properties into view without jumping otherwise.
+  createEffect(
+    on(
+      app.selection,
+      (selection) => {
+        if (selection) section.scrollIntoView({ block: 'nearest' });
+      },
+      { defer: true },
+    ),
+  );
   createEffect(
     on(
       app.editRequest,
@@ -109,7 +120,7 @@ export function InspectorPanel() {
   const endStep = () => app.history.commit();
 
   return (
-    <section class="panel">
+    <section class="panel" ref={(el) => (section = el)}>
       <h2 id="inspector-title">{title()}</h2>
       <Muted id="inspector-empty" hidden={hasSelection()}>
         Click a node or an edge to edit it.

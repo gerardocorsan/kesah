@@ -26,3 +26,10 @@ proto.hasPointerCapture ??= () => false;
 document.elementFromPoint ??= () => null;
 
 afterEach(() => cleanup());
+
+// jsdom has no layout, so scrollIntoView does not exist; record the calls so tests can observe them.
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = function scrollIntoView(this: Element, options?: boolean | ScrollIntoViewOptions) {
+    this.dispatchEvent(new CustomEvent('scroll-into-view', { bubbles: true, detail: options }));
+  };
+}

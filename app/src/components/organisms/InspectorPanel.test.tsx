@@ -187,6 +187,22 @@ describe('InspectorPanel with a node selected', () => {
   });
 });
 
+describe('InspectorPanel in a scrolling sidebar', () => {
+  it('brings itself into view when something is selected, and not before', () => {
+    const s = setup();
+    const scrolled: HTMLElement[] = [];
+    s.container.addEventListener('scroll-into-view', (e) => scrolled.push(e.target as HTMLElement));
+    expect(scrolled).toEqual([]);
+    s.app.select({ kind: 'node', id: s.ids.a });
+    expect(scrolled).toHaveLength(1);
+    expect(scrolled[0].contains(s.form())).toBe(true);
+    s.app.select(null);
+    expect(scrolled).toHaveLength(1);
+    s.app.select({ kind: 'edge', id: s.ids.edge });
+    expect(scrolled).toHaveLength(2);
+  });
+});
+
 describe('InspectorPanel execution properties', () => {
   const executionFields = ['#script-field', '#delay-field', '#message-field', '#expression-field'];
 
