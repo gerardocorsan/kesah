@@ -1,7 +1,7 @@
 node_modules
 dist
-tmp
-
-e2e/last-run.png
 coverage
+tmp
 .claude
+app/e2e/last-run.png
+target

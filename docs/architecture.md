@@ -3,6 +3,7 @@
 This document explains the decisions and invariants behind Kesah, the things a reader cannot
 recover by skimming the code. It is updated when a decision changes, not when code changes.
 For usage and the file map see the [README](../README.md); for working rules see [AGENTS.md](../AGENTS.md).
+Paths below are relative to `app/`, where the web application lives; the Rust backend will live in `server/`.
 
 ## Layers
 

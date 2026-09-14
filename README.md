@@ -2,13 +2,14 @@
 
 A web application for drawing BPMN process diagrams with the mouse: events, tasks, gateways, artifacts and the flows between them. It draws the notation; it does not execute processes, and it has no pools or lanes or BPMN XML yet (see *Limitations*). Built with TypeScript and [SolidJS](https://www.solidjs.com/), the only runtime dependency: the drawing is plain SVG rendered by Solid components, and Vite is used for development and bundling. The document model is framework-free and lives apart from the UI.
 
-Design decisions and invariants are explained in [docs/architecture.md](docs/architecture.md); working rules for contributors and AI assistants are in [AGENTS.md](AGENTS.md).
+The repository holds the web application in `app/` and, from the execution work onwards, a Rust backend in `server/`; documentation, working rules and the start script live at the root. Design decisions and invariants are explained in [docs/architecture.md](docs/architecture.md); working rules for contributors and AI assistants are in [AGENTS.md](AGENTS.md).
 
 ## Getting started
 
 ```bash
+cd app
 npm install
-npm run dev      # development server at http://localhost:5173 (./start does the same)
+npm run dev      # development server at http://localhost:5173 (./start at the root does the same)
 npm run build    # type-check and generate dist/
 npm run preview  # serve dist/ to test the final version
 ```
@@ -16,13 +17,14 @@ npm run preview  # serve dist/ to test the final version
 ## Tests
 
 ```bash
+cd app
 npm test                        # unit tests with coverage; fails below 85 % on any metric
 npm run test:watch              # unit tests in watch mode
 npm run test:e2e                # end-to-end smoke test in a headless Chrome (run `npm run build` first)
 node scripts/verify-tests.mjs   # mutation check: breaks each unit and expects its tests to fail
 ```
 
-Unit tests live next to the code (`*.test.ts` / `*.test.tsx`) and run with Vitest in jsdom. `src/test/setup.ts` provides what jsdom lacks (text measurement, pointer capture, hit-testing). The end-to-end script drives the production build through the Chrome DevTools protocol; set `CHROME_BIN` if Chrome is not `google-chrome`.
+Unit tests live next to the code (`*.test.ts` / `*.test.tsx`) and run with Vitest in jsdom. `app/src/test/setup.ts` provides what jsdom lacks (text measurement, pointer capture, hit-testing). The end-to-end script drives the production build through the Chrome DevTools protocol; set `CHROME_BIN` if Chrome is not `google-chrome`.
 
 ## Elements
 
@@ -81,7 +83,7 @@ The document is automatically saved to `localStorage`, so it persists across pag
 
 ## Structure
 
-The model is framework-free; the interface is made of Solid components organised by [atomic design](https://atomicdesign.bradfrost.com/) levels, each with its stylesheet next to it.
+Everything below is under `app/`. The model is framework-free; the interface is made of Solid components organised by [atomic design](https://atomicdesign.bradfrost.com/) levels, each with its stylesheet next to it.
 
 - `src/model/`: no DOM anywhere in here.
   - `graph.ts`: elements, connections, variants, JSON validation (including the mapping of old flowchart files) and change notifications.
@@ -99,7 +101,7 @@ The model is framework-free; the interface is made of Solid components organised
 - `src/styles/tokens.css`: colour variables and the page reset.
 - `src/test/`: test environment (jsdom stand-ins) and rendering helpers. Tests themselves sit next to the code as `*.test.ts(x)`.
 - `e2e/smoke.mjs`: end-to-end smoke test driving a headless Chrome. `scripts/verify-tests.mjs`: mutation check of the unit tests.
-- `docs/architecture.md`: the decisions behind all of the above.
+- `../docs/architecture.md`: the decisions behind all of the above.
 
 ## JSON format
 
